@@ -47,7 +47,7 @@ export const PLANETS = [
   { id: 'nombres', name: 'Numéris', theme: 'Nombres', emoji: '🔢', colors: ['#ffd27a', '#e07b1f'], ring: false },
   { id: 'calcul', name: 'Calculo', theme: 'Calcul', emoji: '➕', colors: ['#8be0ff', '#2962d9'], ring: true },
   { id: 'problemes', name: 'Problémia', theme: 'Problèmes', emoji: '🧩', colors: ['#b8f28b', '#2a9d4b'], ring: false },
-  { id: 'grandeurs', name: 'Géomia', theme: 'Mesures & formes', emoji: '📐', colors: ['#f4a6ff', '#8a2be2'], ring: true },
+  { id: 'grandeurs', name: 'Géomia', theme: 'Mesures, temps & formes', emoji: '📐', colors: ['#f4a6ff', '#8a2be2'], ring: true },
 ];
 
 // « de » ou « d' » devant une voyelle : « d'autocollants », « d'œufs ».

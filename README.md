@@ -8,10 +8,10 @@ Inspiré de MathHero : chaque mission est un combat contre un alien, chaque bonn
 
 | Planète | Domaine | Exemples de notions |
 |---|---|---|
-| 🟠 **Numéris** | Nombres | centaines/dizaines/unités, comparer, ranger, droite graduée, nombres en lettres, doubles et moitiés |
+| 🟠 **Numéris** | Nombres | centaines/dizaines/unités, comparer, ranger, droite graduée, nombres en lettres, doubles et moitiés, fractions |
 | 🔵 **Calculo** | Calcul | calcul mental, compléments à 10 et à 100, ±10/±100, tables de 0 à 10 dans les deux sens, opérations posées |
 | 🟢 **Problémia** | Problèmes | ajout/retrait, parties d'un tout, comparaison, groupements, partages, deux étapes, corrigés avec schémas en barres |
-| 🟣 **Géomia** | Mesures & géométrie | monnaie, heure, durées, calendrier, règle graduée, unités, figures, solides, quadrillage, angle droit, fractions unitaires |
+| 🟣 **Géomia** | Mesures, temps & géométrie | monnaie, heure, durées, jours et mois, règle graduée, unités, figures, solides, quadrillage, angle droit |
 
 ### Programme 2025 et livret d'accompagnement CE1 (éduscol)
 
