@@ -165,3 +165,74 @@ export function planet(color1, color2, ring = false) {
     <circle cx="38" cy="40" r="5" fill="#fff2"/><circle cx="60" cy="62" r="7" fill="#0001"/>
     ${ring ? '<ellipse cx="50" cy="52" rx="48" ry="11" fill="none" stroke="#fff8" stroke-width="4"/>' : ''}</svg>`;
 }
+
+// Schéma en barres « parties / tout » (modélisation des problèmes).
+export function barParts(a, b, unknown) {
+  const W = 300, wa = Math.max(70, Math.min(230, (a / (a + b)) * W));
+  const lab = (v, key) => (unknown === key ? '?' : fmt(v));
+  return `<svg class="vis bars" viewBox="-2 -2 ${W + 4} 92" role="img" aria-label="schéma en barres">
+    <path d="M0 22 V12 H${W} V22" class="bar-brace"/><text x="${W / 2}" y="9" class="${unknown === 'total' ? 'bar-q' : ''}">${lab(a + b, 'total')}</text>
+    <rect x="0" y="30" width="${wa}" height="40" class="bar-a"/><rect x="${wa}" y="30" width="${W - wa}" height="40" class="bar-b"/>
+    <text x="${wa / 2}" y="57" class="${unknown === 'a' ? 'bar-q' : ''}">${lab(a, 'a')}</text><text x="${wa + (W - wa) / 2}" y="57" class="${unknown === 'b' ? 'bar-q' : ''}">${lab(b, 'b')}</text></svg>`;
+}
+
+// Schéma de comparaison : deux barres et leur écart.
+export function barCompare(big, small, names, unknown) {
+  const W = 300, ws = Math.max(80, Math.min(220, (small / big) * W));
+  const lab = (v, key) => (unknown === key ? '?' : fmt(v));
+  return `<svg class="vis bars" viewBox="-2 -2 ${W + 4} 110" role="img" aria-label="schéma de comparaison">
+    <text x="0" y="12" class="bar-name">${names[0]}</text>
+    <rect x="0" y="18" width="${W}" height="30" class="bar-a"/><text x="${W / 2}" y="39" class="${unknown === 'big' ? 'bar-q' : ''}">${lab(big, 'big')}</text>
+    <text x="0" y="66" class="bar-name">${names[1]}</text>
+    <rect x="0" y="72" width="${ws}" height="30" class="bar-b"/><text x="${ws / 2}" y="93" class="${unknown === 'small' ? 'bar-q' : ''}">${lab(small, 'small')}</text>
+    <rect x="${ws}" y="72" width="${W - ws}" height="30" class="bar-diff"/><text x="${ws + (W - ws) / 2}" y="93" class="${unknown === 'diff' ? 'bar-q' : ''}">${lab(big - small, 'diff')}</text></svg>`;
+}
+
+export function solid(name) {
+  const st = 'class="sol"', st2 = 'class="sol2"', st3 = 'class="sol3"', hid = 'class="sol-hidden"';
+  const svg = {
+    cube: `<polygon points="40,60 120,60 120,140 40,140" ${st}/><polygon points="40,60 80,30 160,30 120,60" ${st2}/><polygon points="120,60 160,30 160,110 120,140" ${st3}/>`,
+    'pavé': `<polygon points="20,80 140,80 140,140 20,140" ${st}/><polygon points="20,80 60,50 180,50 140,80" ${st2}/><polygon points="140,80 180,50 180,110 140,140" ${st3}/>`,
+    boule: `<circle cx="100" cy="85" r="60" ${st}/><ellipse cx="100" cy="85" rx="60" ry="16" ${hid}/><circle cx="78" cy="62" r="12" fill="#fff6"/>`,
+    cylindre: `<path d="M50 40 V130 A50 14 0 0 0 150 130 V40" ${st}/><ellipse cx="100" cy="40" rx="50" ry="14" ${st2}/><path d="M50 130 A50 14 0 0 1 150 130" ${hid}/>`,
+    'cône': `<path d="M100 20 L45 130 A55 15 0 0 0 155 130 Z" ${st}/><path d="M45 130 A55 15 0 0 1 155 130" ${hid}/>`,
+    pyramide: `<polygon points="100,20 40,130 120,145" ${st}/><polygon points="100,20 120,145 165,115" ${st3}/><polyline points="40,130 85,105 165,115" ${hid}/><line x1="100" y1="20" x2="85" y2="105" ${hid}/>`,
+  }[name];
+  return `<svg class="vis shape" viewBox="0 0 200 160" role="img" aria-label="solide">${svg}</svg>`;
+}
+
+// Quadrillage avec un point de départ et des cases repérées par des lettres.
+export function grid(size, start, marks) {
+  const c = 44;
+  let s = '';
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) s += `<rect x="${x * c}" y="${y * c}" width="${c}" height="${c}" class="grid-cell"/>`;
+  s += `<text x="${start[0] * c + c / 2}" y="${start[1] * c + c / 2 + 10}" class="grid-start">🚀</text>`;
+  for (const [letter, [x, y]] of Object.entries(marks)) s += `<text x="${x * c + c / 2}" y="${y * c + c / 2 + 9}" class="grid-mark">${letter}</text>`;
+  return `<svg class="vis grid" viewBox="-2 -2 ${size * c + 4} ${size * c + 4}" role="img" aria-label="quadrillage">${s}</svg>`;
+}
+
+// Trois angles A, B, C à comparer avec l'équerre.
+export function angles(list) {
+  return `<div class="vis angles">${list.map(([letter, deg, rot]) => {
+    const r = (Math.PI / 180), L = 70;
+    const p1 = [60 + L * Math.cos(rot * r), 80 - L * Math.sin(rot * r)];
+    const p2 = [60 + L * Math.cos((rot + deg) * r), 80 - L * Math.sin((rot + deg) * r)];
+    return `<svg viewBox="-20 -10 160 120" role="img" aria-label="angle ${letter}"><polyline points="${p1} 60,80 ${p2}" class="ang"/>
+      <circle cx="60" cy="80" r="4" class="ang-pt"/><text x="60" y="108" class="ang-l">${letter}</text></svg>`;
+  }).join('')}</div>`;
+}
+
+// Petit alien adversaire (dessiné en SVG, varie selon la planète et le niveau).
+export function alien(color, level = 1, boss = false, size = 90) {
+  const eyes = level % 3 === 0 ? [[50, 48]] : level % 3 === 1 ? [[40, 48], [60, 48]] : [[34, 50], [50, 44], [66, 50]];
+  const ant = level >= 2 ? `<line x1="38" y1="22" x2="30" y2="6" class="al-line"/><circle cx="30" cy="6" r="5" fill="${color}"/>
+    <line x1="62" y1="22" x2="70" y2="6" class="al-line"/><circle cx="70" cy="6" r="5" fill="${color}"/>` : '';
+  const horns = level >= 4 ? `<path d="M22 40 L10 22 L30 32Z M78 40 L90 22 L70 32Z" fill="#fff8"/>` : '';
+  const crown = boss ? `<path d="M30 20 L36 2 L45 14 L50 0 L55 14 L64 2 L70 20 Z" fill="#ffd23f" stroke="#b88a00" stroke-width="2"/>` : '';
+  return `<svg class="alien${boss ? ' boss' : ''}" width="${size}" height="${size}" viewBox="0 -4 100 104" aria-hidden="true">
+    ${ant}${horns}
+    <path d="M14 88 C4 60 16 22 50 20 C84 22 96 60 86 88 C78 96 70 86 64 94 C58 100 42 100 36 94 C30 86 22 96 14 88Z" fill="${color}" stroke="#0004" stroke-width="3"/>
+    <ellipse cx="34" cy="34" rx="8" ry="5" fill="#fff5"/>
+    ${eyes.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="9" fill="#fff"/><circle class="al-pupil" cx="${x + 2}" cy="${y + 2}" r="4.5" fill="#23204a"/>`).join('')}
+    <path d="M38 70 Q50 80 62 70" fill="none" stroke="#23204a" stroke-width="4" stroke-linecap="round"/>${crown}</svg>`;
+}

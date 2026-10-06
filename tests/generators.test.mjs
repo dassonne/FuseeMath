@@ -1,6 +1,6 @@
 // Génère beaucoup d'exercices à chaque niveau et vérifie leur cohérence.
 // Lancer : node tests/generators.test.mjs
-import { SKILLS, MAX_BY_LEVEL, buildMission, PLANETS } from '../js/skills.js';
+import { SKILLS, NUM_MAX, buildMission, buildFlash, PLANETS } from '../js/skills.js';
 import { toWords } from '../js/util.js';
 
 let failures = 0;
@@ -17,6 +17,7 @@ for (const skill of SKILLS) {
       const q = skill.gen(L);
       const where = `${skill.id} L${L}`;
       if (!q.prompt || !q.hint || !q.explain) fail(`${where}: texte manquant`, q);
+      if (/\bde [aeiouéœ]/i.test(q.prompt + q.hint)) fail(`${where}: élision manquante (de → d')`, q);
       if (/undefined|NaN/.test(q.prompt + q.explain + q.hint + (q.visual || '') + (q.say || ''))) fail(`${where}: undefined/NaN`, q);
       switch (q.type) {
         case 'numpad':
@@ -32,12 +33,12 @@ for (const skill of SKILLS) {
           const asc = JSON.stringify(sorted) === JSON.stringify(q.answer);
           const desc = JSON.stringify(sorted.reverse()) === JSON.stringify(q.answer);
           if (!asc && !desc) fail(`${where}: ordre incorrect`, q);
-          if (q.items.some((n) => n >= MAX_BY_LEVEL[L] || n < 0)) fail(`${where}: nombre hors programme`, q);
+          if (q.items.some((n) => n >= NUM_MAX[L] || n < 0)) fail(`${where}: nombre hors programme`, q);
           break;
         }
         case 'line':
           if (!(q.answer >= 1 && q.answer <= 9)) fail(`${where}: graduation invalide`, q);
-          if (q.line.start + q.line.count * q.line.step > MAX_BY_LEVEL[L]) fail(`${where}: droite hors programme`, q);
+          if (q.line.start + q.line.count * q.line.step > NUM_MAX[L]) fail(`${where}: droite hors programme`, q);
           break;
         default: fail(`${where}: type inconnu`, q);
       }
@@ -53,6 +54,19 @@ for (let L = 1; L <= 5; L++) {
     if (m.some((q) => !q.skill.startsWith(p.id[0]))) fail(`mission ${p.id}: notion d'une autre planète`, m);
   }
   if (buildMission(levels, 5).length !== 5) fail(`mission mélange L${L}`, {});
+}
+
+// Défi éclair : 12 calculs rapides à saisir au pavé numérique.
+for (let L = 1; L <= 5; L++) {
+  const f = buildFlash(L, 12);
+  if (f.length !== 12 || f.some((q) => q.type !== 'numpad' || !q.skill.startsWith('c_'))) fail(`défi éclair L${L}`, f);
+}
+
+// Tables choisies par le parent.
+const mult = SKILLS.find((s) => s.id === 'c_mult');
+for (let i = 0; i < 200; i++) {
+  const q = mult.gen(5, { tables: [7] });
+  if (!/\b7\b/.test(q.prompt)) fail('tables imposées non respectées', q);
 }
 
 if (failures) { console.error(`\n${failures} échec(s)`); process.exit(1); }

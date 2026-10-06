@@ -1,11 +1,11 @@
 // Générateurs d'exercices, alignés sur les repères annuels de CE1 (cycle 2).
 //
-// Le niveau (1 à 5) suit les 5 périodes de l'année :
+// Le niveau (1 à 5) suit les 5 périodes de l'année (programme 2025) :
 //   1 = sept.–oct.  nombres jusqu'à 100
-//   2 = nov.–déc.   nombres jusqu'à 200
-//   3 = janv.–fév.  nombres jusqu'à 500
-//   4 = mars–avril  nombres jusqu'à 1 000
-//   5 = mai–juin    consolidation jusqu'à 1 000
+//   2 = nov.–déc.   nombres jusqu'à 1 000 (au plus tard en période 2), premières fractions
+//   3 = janv.–fév.  approfondissement, calculs jusqu'à 500
+//   4 = mars–avril  calculs jusqu'à 1 000
+//   5 = mai–juin    consolidation, toutes les tables de 0 à 10
 //
 // Chaque générateur renvoie une question :
 //   { prompt, say?, visual?, type, answer, choices?, items?, line?, suffix?, hint, explain }
@@ -13,8 +13,15 @@
 import { rand, pick, chance, shuffle, sample, numChoices, fmt, toWords, NAMES } from './util.js';
 import * as V from './visuals.js';
 
-export const MAX_BY_LEVEL = [0, 100, 200, 500, 1000, 1000];
-const maxN = (L) => MAX_BY_LEVEL[L];
+// Étendue des nombres (numération) et des calculs, par niveau.
+export const NUM_MAX = [0, 100, 1000, 1000, 1000, 1000];
+export const CALC_MAX = [0, 100, 200, 500, 1000, 1000];
+const maxN = (L) => NUM_MAX[L];
+const calcN = (L) => CALC_MAX[L];
+
+// Tables de multiplication travaillées selon le niveau (toutes, de 0 à 10, en fin de CE1).
+export const TABLES_BY_LEVEL = [[], [2, 10], [2, 5, 10], [2, 3, 4, 5, 10], [2, 3, 4, 5, 6, 10], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]];
+const tablesFor = (L, opts) => (opts && opts.tables && opts.tables.length ? opts.tables : TABLES_BY_LEVEL[L]);
 
 export const PLANETS = [
   { id: 'nombres', name: 'Numéris', theme: 'Nombres', emoji: '🔢', colors: ['#ffd27a', '#e07b1f'], ring: false },
@@ -22,6 +29,9 @@ export const PLANETS = [
   { id: 'problemes', name: 'Problémia', theme: 'Problèmes', emoji: '🧩', colors: ['#b8f28b', '#2a9d4b'], ring: false },
   { id: 'grandeurs', name: 'Géomia', theme: 'Mesures & formes', emoji: '📐', colors: ['#f4a6ff', '#8a2be2'], ring: true },
 ];
+
+// « de » ou « d' » devant une voyelle : « d'autocollants », « d'œufs ».
+const de = (word) => (/^[aeiouyéèêœh]/i.test(word) ? `d'${word}` : `de ${word}`);
 
 const decomp = (n) => [Math.floor(n / 100), Math.floor((n % 100) / 10), n % 10];
 
@@ -126,7 +136,7 @@ const nombres = [
   {
     id: 'n_line', label: 'Placer un nombre sur la droite graduée', minLevel: 1,
     gen(L) {
-      const step = pick(L <= 2 ? [1, 1, 10] : [1, 10, 10, 100].filter((s) => s * 10 <= maxN(L)));
+      const step = pick(L === 1 ? [1, 1, 10] : [1, 10, 10, 100]);
       const span = step * 10;
       const start = step === 100 ? 0 : rand(0, Math.floor((maxN(L) - span) / span)) * span;
       const idx = rand(1, 9);
@@ -201,7 +211,7 @@ const nombres = [
 function addPair(L) {
   if (L === 1) { const a = rand(10, 89), b = rand(1, 9); return a + b < 100 ? [a, b] : [a - 10, b]; }
   if (L === 2) { const a = rand(10, 70), b = rand(10, 99 - a); return [a, b]; }
-  const m = maxN(L), a = rand(100, m - 100), b = chance(0.5) ? rand(1, 9) * 10 : rand(11, Math.min(99, m - a - 1));
+  const m = calcN(L), a = rand(100, m - 100), b = chance(0.5) ? rand(1, 9) * 10 : rand(11, Math.min(99, m - a - 1));
   return [a, b];
 }
 
@@ -246,8 +256,8 @@ const calcul = [
   {
     id: 'c_tens', label: 'Ajouter ou enlever 10, 100', minLevel: 1,
     gen(L) {
-      const step = L === 1 ? 10 : pick([10, 100, 20, 50].filter((s) => s * 2 < maxN(L)));
-      const plus = chance(0.5), m = maxN(L);
+      const step = L === 1 ? 10 : pick([10, 100, 20, 50].filter((s) => s * 2 < calcN(L)));
+      const plus = chance(0.5), m = calcN(L);
       const a = plus ? rand(1, m - step - 1) : rand(step, m - 1);
       const r = plus ? a + step : a - step;
       return {
@@ -270,11 +280,14 @@ const calcul = [
   },
   {
     id: 'c_mult', label: 'Tables de multiplication', minLevel: 2,
-    gen(L) {
-      const tables = L === 2 ? [2, 5, 10] : L === 3 ? [2, 3, 5, 10] : [2, 3, 4, 5, 10];
-      const t = pick(tables), k = rand(1, 10);
+    gen(L, opts) {
+      const t = pick(tablesFor(L, opts)), k = rand(0, 10) || rand(1, 10);
       const [a, b] = chance(0.5) ? [t, k] : [k, t];
       const small = Math.min(a, b), big = Math.max(a, b);
+      if (small === 0) return {
+        prompt: `${a} × ${b} = ?`, type: 'numpad', answer: 0,
+        hint: '0 fois un nombre, ou un nombre fois 0 : il n\'y a rien du tout !', explain: `${a} × ${b} = <b>0</b>`,
+      };
       return {
         prompt: `${a} × ${b} = ?`, type: 'numpad', answer: a * b,
         visual: a * b <= 30 ? V.groups(small, big, '⭐') : undefined,
@@ -284,9 +297,23 @@ const calcul = [
     },
   },
   {
+    id: 'c_mult_inv', label: 'Tables dans les deux sens (? × 4 = 20)', minLevel: 3,
+    gen(L, opts) {
+      const t = pick(tablesFor(L, opts).filter((x) => x > 1).concat([2])), k = rand(2, 10), c = t * k;
+      if (chance(0.5)) return {
+        prompt: `? × ${t} = ${c}`, say: `Combien de fois ${t} égale ${c} ?`, type: 'numpad', answer: k,
+        hint: `Récite la table de ${t} jusqu'à trouver ${c}.`, explain: `<b>${k}</b> × ${t} = ${c}`,
+      };
+      return {
+        prompt: `${c} = ${t} × ?`, say: `${c} égale ${t} fois combien ?`, type: 'numpad', answer: k,
+        hint: `Dans la table de ${t}, quel nombre donne ${c} ?`, explain: `${c} = ${t} × <b>${k}</b>`,
+      };
+    },
+  },
+  {
     id: 'c_posed', label: 'Opérations posées', minLevel: 2,
     gen(L) {
-      const m = maxN(L);
+      const m = calcN(L);
       if (L >= 4 && chance(0.4)) {
         const a = rand(200, m - 1), b = rand(20, a - 50);
         return {
@@ -321,18 +348,18 @@ const problemes = [
       const a = rand(5, Math.floor(R * 0.7)), b = rand(2, Math.max(3, Math.floor(R * 0.3)));
       if (chance(0.5)) {
         return {
-          prompt: `${who} a ${a} ${thing}. Pendant la récréation, ${who} en gagne ${b}. Combien de ${thing} a ${who} maintenant ?`,
+          prompt: `${who} a ${a} ${thing}. Pendant la récréation, ${who} en gagne ${b}. Combien ${de(thing)} a ${who} maintenant ?`,
           visual: `<div class="emoji-big">${em}</div>`, type: 'numpad', answer: a + b,
-          hint: `${who} gagne des ${thing} : en a-t-il plus ou moins qu'avant ? Il faut ajouter.`,
-          explain: `${a} + ${b} = <b>${a + b}</b> ${thing}`,
+          hint: `${who} gagne des ${thing} : il y en a plus qu'avant. Il faut ajouter.`,
+          explain: `${a} + ${b} = <b>${a + b}</b> ${thing}${V.barParts(a, b, 'total')}`,
         };
       }
       const big = a + b;
       return {
-        prompt: `${who} a ${big} ${thing}. ${who} en donne ${b} à un ami. Combien de ${thing} reste-t-il ?`,
+        prompt: `${who} a ${big} ${thing}. ${who} en donne ${b} à un ami. Combien ${de(thing)} reste-t-il ?`,
         visual: `<div class="emoji-big">${em}</div>`, type: 'numpad', answer: a,
         hint: `${who} donne des ${thing} : il en reste moins. Il faut enlever.`,
-        explain: `${big} − ${b} = <b>${a}</b> ${thing}`,
+        explain: `${big} − ${b} = <b>${a}</b> ${thing}${V.barParts(a, b, 'a')}`,
       };
     },
   },
@@ -348,14 +375,14 @@ const problemes = [
       if (L === 1 || chance(0.4)) {
         return {
           prompt: `Il y a ${a} ${x} et ${b} ${y} ${where}. Combien y en a-t-il en tout ?`, type: 'numpad', answer: a + b,
-          hint: 'On réunit les deux groupes : il faut ajouter.', explain: `${a} + ${b} = <b>${a + b}</b>`,
+          hint: 'On réunit les deux groupes : il faut ajouter.', explain: `${a} + ${b} = <b>${a + b}</b>${V.barParts(a, b, 'total')}`,
         };
       }
       return {
-        prompt: `Il y a ${a + b} ${all} ${where} en tout. ${a} sont des ${x}, les autres sont des ${y}. Combien y a-t-il de ${y} ?`,
+        prompt: `Il y a ${a + b} ${all} ${where} en tout. ${a} sont des ${x}, les autres sont des ${y}. Combien y a-t-il ${de(y)} ?`,
         type: 'numpad', answer: b,
         hint: `Tu connais le total et une partie. Cherche ce qu'il faut ajouter à ${a} pour avoir ${a + b}.`,
-        explain: `${a + b} − ${a} = <b>${b}</b>`,
+        explain: `${a + b} − ${a} = <b>${b}</b>${V.barParts(a, b, 'b')}`,
       };
     },
   },
@@ -366,16 +393,16 @@ const problemes = [
       const a = rand(5, Math.floor(R * 0.6)), d = rand(2, Math.max(3, Math.floor(R * 0.3)));
       const k = L >= 4 ? pick(['more', 'less', 'diff']) : pick(['more', 'diff']);
       if (k === 'more') return {
-        prompt: `${p1} a ${a} ${thing}. ${p2} en a ${d} de plus que ${p1}. Combien de ${thing} a ${p2} ?`, type: 'numpad', answer: a + d,
-        hint: `${p2} en a plus que ${p1} : autant que ${p1}, et encore ${d}.`, explain: `${a} + ${d} = <b>${a + d}</b>`,
+        prompt: `${p1} a ${a} ${thing}. ${p2} en a ${d} de plus que ${p1}. Combien ${de(thing)} a ${p2} ?`, type: 'numpad', answer: a + d,
+        hint: `${p2} en a plus que ${p1} : autant que ${p1}, et encore ${d}.`, explain: `${a} + ${d} = <b>${a + d}</b>${V.barCompare(a + d, a, [p2, p1], 'big')}`,
       };
       if (k === 'less') return {
-        prompt: `${p1} a ${a + d} ${thing}. ${p2} en a ${d} de moins que ${p1}. Combien de ${thing} a ${p2} ?`, type: 'numpad', answer: a,
-        hint: `${p2} en a moins : il faut enlever ${d}.`, explain: `${a + d} − ${d} = <b>${a}</b>`,
+        prompt: `${p1} a ${a + d} ${thing}. ${p2} en a ${d} de moins que ${p1}. Combien ${de(thing)} a ${p2} ?`, type: 'numpad', answer: a,
+        hint: `${p2} en a moins : il faut enlever ${d}.`, explain: `${a + d} − ${d} = <b>${a}</b>${V.barCompare(a + d, a, [p1, p2], 'small')}`,
       };
       return {
-        prompt: `${p1} a ${a + d} ${thing} et ${p2} en a ${a}. Combien ${p1} en a-t-il de plus que ${p2} ?`, type: 'numpad', answer: d,
-        hint: `Cherche l'écart : ${a} + ? = ${a + d}.`, explain: `${a + d} − ${a} = <b>${d}</b>`,
+        prompt: `${p1} a ${a + d} ${thing} et ${p2} en a ${a}. ${p1} en a combien de plus que ${p2} ?`, type: 'numpad', answer: d,
+        hint: `Cherche l'écart : ${a} + ? = ${a + d}.`, explain: `${a + d} − ${a} = <b>${d}</b>${V.barCompare(a + d, a, [p1, p2], 'diff')}`,
       };
     },
   },
@@ -385,7 +412,7 @@ const problemes = [
       const per = pick(L === 2 ? [2, 5, 10] : [2, 3, 4, 5, 10]), n = rand(2, L === 2 ? 5 : 9);
       const [box, thing, em] = pick([['boîtes', 'œufs', '🥚'], ['sachets', 'bonbons', '🍬'], ['paquets', 'cartes', '🃏'], ['vases', 'fleurs', '🌼']]);
       return {
-        prompt: `Il y a ${n} ${box}. Dans chaque ${box.slice(0, -1)}, il y a ${per} ${thing}. Combien y a-t-il de ${thing} en tout ?`,
+        prompt: `Il y a ${n} ${box}. Dans chaque ${box.slice(0, -1)}, il y a ${per} ${thing}. Combien y a-t-il ${de(thing)} en tout ?`,
         visual: n * per <= 40 ? V.groups(n, per, em) : undefined, type: 'numpad', answer: n * per,
         hint: `${n} fois ${per} ${thing}. Tu peux compter de ${per} en ${per}.`,
         explain: `${n} × ${per} = <b>${n * per}</b> ${thing}`,
@@ -398,7 +425,7 @@ const problemes = [
       const k = rand(2, 5), each = rand(2, L >= 4 ? 10 : 6), tot = k * each;
       const [thing, em] = pick(ITEMS);
       return {
-        prompt: `On partage équitablement ${tot} ${thing} entre ${k} enfants. Combien de ${thing} aura chaque enfant ?`,
+        prompt: `On partage équitablement ${tot} ${thing} entre ${k} enfants. Combien ${de(thing)} aura chaque enfant ?`,
         visual: `<div class="emoji-big">${em.repeat(Math.min(tot, 12))}${tot > 12 ? '…' : ''}</div>`, type: 'numpad', answer: each,
         hint: `Distribue un par un à chaque enfant, ou cherche : ${k} × ? = ${tot}.`,
         explain: `${k} × ${each} = ${tot}, donc chacun en a <b>${each}</b>`,
@@ -421,6 +448,9 @@ const problemes = [
 ];
 
 // ---------------------------------------------------------------- Grandeurs & géométrie
+const FRACTION_NAMES = { 2: 'un demi', 3: 'un tiers', 4: 'un quart', 5: 'un cinquième', 6: 'un sixième', 8: 'un huitième', 10: 'un dixième' };
+const DAYS = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
+const MONTHS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
 const fmtTime = (h, m) => `${h} h${m ? ' ' + String(m).padStart(2, '0') : ''}`;
 
 const grandeurs = [
@@ -550,15 +580,108 @@ const grandeurs = [
     },
   },
   {
-    id: 'g_fraction', label: 'Fractions : un demi, un tiers, un quart', minLevel: 3,
-    gen() {
-      const parts = pick([2, 3, 4]);
-      const names = { 2: 'un demi', 3: 'un tiers', 4: 'un quart' };
+    id: 'g_fraction', label: 'Fractions : un demi, un tiers, un quart…', minLevel: 2,
+    gen(L) {
+      const dens = L === 2 ? [2, 4] : L === 3 ? [2, 3, 4] : [2, 3, 4, 5, 6, 8, 10];
+      const parts = pick(dens);
+      if (L >= 4 && chance(0.35)) {
+        const d = pick([2, 3, 4, 5, 10]), each = rand(2, 10), tot = d * each, [thing, em] = pick(ITEMS);
+        return {
+          prompt: `Combien font <b>${FRACTION_NAMES[d]}</b> de ${tot} ${thing} ?`, visual: `<div class="emoji-big">${em}</div>`,
+          type: 'numpad', answer: each,
+          hint: `${FRACTION_NAMES[d][0].toUpperCase() + FRACTION_NAMES[d].slice(1)}, c'est une part quand on partage en ${d} parts égales.`,
+          explain: `${tot} partagé en ${d} parts égales : ${d} × ${each} = ${tot}, donc <b>${each}</b>`,
+        };
+      }
+      const others = sample(dens.filter((x) => x !== parts), Math.min(3, dens.length - 1));
       return {
         prompt: 'Quelle part de la figure est coloriée ?', visual: V.fraction(parts, pick(['rect', 'disc'])), type: 'choice',
-        choices: ['un demi', 'un tiers', 'un quart'], answer: names[parts],
-        hint: 'Compte en combien de parts égales la figure est partagée : 2 parts → un demi, 3 → un tiers, 4 → un quart.',
-        explain: `La figure est partagée en ${parts} parts égales : une part, c'est <b>${names[parts]}</b>.`,
+        choices: shuffle([parts, ...others]).map((d) => FRACTION_NAMES[d]), answer: FRACTION_NAMES[parts],
+        hint: 'Compte en combien de parts égales la figure est partagée : 2 → un demi, 3 → un tiers, 4 → un quart…',
+        explain: `La figure est partagée en ${parts} parts égales : une part, c'est <b>${FRACTION_NAMES[parts]}</b>.`,
+      };
+    },
+  },
+  {
+    id: 'g_calendar', label: 'Jours, mois et calendrier', minLevel: 1,
+    gen(L) {
+      const kind = pick(L >= 3 ? ['dayAfter', 'dayBefore', 'month', 'inDays'] : ['dayAfter', 'dayBefore', 'month']);
+      const list = kind === 'month' ? MONTHS : DAYS;
+      const i = rand(0, list.length - 1);
+      let q, ans, hint;
+      if (kind === 'dayAfter') { q = `Quel jour vient juste <b>après</b> ${list[i]} ?`; ans = list[(i + 1) % 7]; hint = 'Récite les jours : lundi, mardi, mercredi, jeudi, vendredi, samedi, dimanche.'; }
+      else if (kind === 'dayBefore') { q = `Quel jour vient juste <b>avant</b> ${list[i]} ?`; ans = list[(i + 6) % 7]; hint = 'Récite les jours dans l\'ordre et regarde celui qui est juste avant.'; }
+      else if (kind === 'month') { q = `Quel mois vient juste <b>après</b> ${list[i]} ?`; ans = list[(i + 1) % 12]; hint = 'Janvier, février, mars, avril, mai, juin, juillet, août, septembre, octobre, novembre, décembre.'; }
+      else { const k = rand(2, 5); q = `Aujourd'hui, c'est ${list[i]}. Quel jour serons-nous dans <b>${k} jours</b> ?`; ans = list[(i + k) % 7]; hint = `Avance de ${k} jours dans la semaine, un jour à la fois.`; }
+      const opts = new Set([ans]);
+      while (opts.size < 4) opts.add(pick(list));
+      return { prompt: q, type: 'choice', choices: shuffle([...opts]), answer: ans, hint, explain: `C'est <b>${ans}</b>.` };
+    },
+  },
+  {
+    id: 'g_solids', label: 'Reconnaître les solides', minLevel: 2,
+    gen() {
+      const names = ['cube', 'pavé', 'boule', 'cylindre', 'cône', 'pyramide'];
+      const n = pick(names);
+      const hints = {
+        cube: '6 faces carrées, toutes pareilles, comme un dé.', 'pavé': '6 faces rectangulaires, comme une boîte à chaussures.',
+        boule: 'Elle est toute ronde et roule dans tous les sens.', cylindre: 'Deux disques reliés par une surface qui roule, comme une boîte de conserve.',
+        'cône': 'Un disque et une pointe, comme un cornet de glace.', pyramide: 'Des faces triangulaires qui se rejoignent en pointe.',
+      };
+      return {
+        prompt: 'Comment s\'appelle ce solide ?', visual: V.solid(n), type: 'choice',
+        choices: shuffle([n, ...sample(names.filter((x) => x !== n), 3)]), answer: n,
+        hint: hints[n], explain: `C'est un${['boule'].includes(n) ? 'e' : ''} <b>${n}</b> : ${hints[n].toLowerCase()}`,
+      };
+    },
+  },
+  {
+    id: 'g_grid', label: 'Se déplacer sur un quadrillage', minLevel: 2,
+    gen(L) {
+      const size = 5, DIRS = { '→': [1, 0], '←': [-1, 0], '↑': [0, -1], '↓': [0, 1] };
+      const nMoves = L >= 4 ? rand(4, 5) : rand(2, 3);
+      let pos, moves, guard = 0;
+      do {
+        pos = [rand(0, size - 1), rand(0, size - 1)]; moves = [];
+        let p = pos.slice(), ok = true;
+        for (let i = 0; i < nMoves; i++) {
+          const d = pick(Object.keys(DIRS)); p = [p[0] + DIRS[d][0], p[1] + DIRS[d][1]]; moves.push(d);
+          if (p[0] < 0 || p[1] < 0 || p[0] >= size || p[1] >= size) { ok = false; break; }
+        }
+        if (ok && (p[0] !== pos[0] || p[1] !== pos[1])) { moves.end = p; break; }
+      } while (guard++ < 200);
+      const end = moves.end, key = (c) => c.join(',');
+      // Distracteurs : erreurs fréquentes (gauche/droite inversées, un pas de trop), puis cases au hasard.
+      const mirror = [pos[0] - (end[0] - pos[0]), end[1]], cells = [end];
+      for (const c of [mirror, [end[0] + 1, end[1]], [end[0], end[1] - 1]]) {
+        if (cells.length < 4 && c[0] >= 0 && c[1] >= 0 && c[0] < size && c[1] < size && !cells.some((x) => key(x) === key(c)) && key(c) !== key(pos)) cells.push(c);
+      }
+      while (cells.length < 4) {
+        const c = [rand(0, size - 1), rand(0, size - 1)];
+        if (!cells.some((x) => key(x) === key(c)) && key(c) !== key(pos)) cells.push(c);
+      }
+      const letters = ['A', 'B', 'C', 'D'], order = shuffle(cells), marks = {};
+      order.forEach((c, i) => { marks[letters[i]] = c; });
+      const ans = letters[order.findIndex((c) => key(c) === key(end))];
+      return {
+        prompt: `La fusée suit ce chemin : <span class="arrows">${moves.join(' ')}</span><br>Sur quelle case arrive-t-elle ?`,
+        say: 'La fusée suit le chemin des flèches. Sur quelle case arrive-t-elle ?',
+        visual: V.grid(size, pos, marks), type: 'choice', choices: letters, answer: ans,
+        hint: 'Mets ton doigt sur la fusée et avance d\'une case pour chaque flèche.',
+        explain: `En suivant ${moves.join(' ')}, la fusée arrive sur la case <b>${ans}</b>.`,
+      };
+    },
+  },
+  {
+    id: 'g_angle', label: 'Reconnaître un angle droit', minLevel: 3,
+    gen() {
+      const letters = ['A', 'B', 'C'], right = rand(0, 2);
+      const others = shuffle([pick([45, 60, 70]), pick([110, 120, 135])]);
+      const list = letters.map((l, i) => [l, i === right ? 90 : others.pop(), rand(-20, 40)]);
+      return {
+        prompt: 'Quel angle est un <b>angle droit</b> ?', visual: V.angles(list), type: 'choice', choices: letters, answer: letters[right],
+        hint: 'Un angle droit, c\'est comme le coin d\'une feuille ou de l\'équerre. Les autres sont plus ouverts ou plus fermés.',
+        explain: `L'angle <b>${letters[right]}</b> est droit : il a la forme exacte du coin de l'équerre.`,
       };
     },
   },
@@ -573,7 +696,7 @@ export const skillsFor = (planetId, level) => byPlanet[planetId].filter((s) => s
 
 // Compose une mission de `count` questions.
 // Priorité aux notions à revoir, puis aux notions récentes du niveau.
-export function buildMission(planetLevels, count, review = [], planetId = null) {
+export function buildMission(planetLevels, count, review = [], planetId = null, opts = {}) {
   const pool = [];
   for (const p of PLANETS) {
     if (planetId && p.id !== planetId) continue;
@@ -595,7 +718,15 @@ export function buildMission(planetLevels, count, review = [], planetId = null) 
     if (chosen.filter(([s]) => s.id === cand[0].id).length >= maxRepeat) continue;
     chosen.push(cand);
   }
-  return shuffle(chosen).map(([s, L]) => ({ skill: s.id, level: L, ...s.gen(L) }));
+  return shuffle(chosen).map(([s, L]) => ({ skill: s.id, level: L, ...s.gen(L, opts) }));
+}
+
+// Défi éclair (boss de Calculo) : calculs rapides, comme la fluence attendue
+// en fin de CE1 (12 résultats en 3 minutes).
+const FLASH_SKILLS = ['c_add', 'c_sub', 'c_complement', 'c_tens', 'c_mult'];
+export function buildFlash(level, count, opts = {}) {
+  const ids = FLASH_SKILLS.filter((id) => SKILL_BY_ID[id].minLevel <= level);
+  return Array.from({ length: count }, () => { const s = SKILL_BY_ID[pick(ids)]; return { skill: s.id, level, ...s.gen(level, opts) }; });
 }
 
 export { toWords };
