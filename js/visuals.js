@@ -268,3 +268,14 @@ export function alien(color, level = 1, boss = false, size = 90) {
     ${eyes.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="9" fill="#fff"/><circle class="al-pupil" cx="${x + 2}" cy="${y + 2}" r="4.5" fill="#23204a"/>`).join('')}
     <path d="M38 70 Q50 80 62 70" fill="none" stroke="#23204a" stroke-width="4" stroke-linecap="round"/>${crown}</svg>`;
 }
+
+// Calendrier d'un mois (semaine commençant le lundi). `start` : 0 = lundi.
+export function month(name, start, nDays, highlight = null) {
+  const head = ['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((d) => `<th>${d}</th>`).join('');
+  const cells = Array(start).fill('<td></td>');
+  for (let d = 1; d <= nDays; d++) cells.push(`<td class="${d === highlight ? 'hl' : ''}">${d}</td>`);
+  while (cells.length % 7) cells.push('<td></td>');
+  const rows = [];
+  for (let i = 0; i < cells.length; i += 7) rows.push(`<tr>${cells.slice(i, i + 7).join('')}</tr>`);
+  return `<table class="vis month"><caption>${name}</caption><thead><tr>${head}</tr></thead><tbody>${rows.join('')}</tbody></table>`;
+}

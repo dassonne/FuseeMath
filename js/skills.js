@@ -47,7 +47,8 @@ export const PLANETS = [
   { id: 'nombres', name: 'Numéris', theme: 'Nombres', emoji: '🔢', colors: ['#ffd27a', '#e07b1f'], ring: false },
   { id: 'calcul', name: 'Calculo', theme: 'Calcul', emoji: '➕', colors: ['#8be0ff', '#2962d9'], ring: true },
   { id: 'problemes', name: 'Problémia', theme: 'Problèmes', emoji: '🧩', colors: ['#b8f28b', '#2a9d4b'], ring: false },
-  { id: 'grandeurs', name: 'Géomia', theme: 'Mesures, temps & formes', emoji: '📐', colors: ['#f4a6ff', '#8a2be2'], ring: true },
+  { id: 'grandeurs', name: 'Géomia', theme: 'Mesures & formes', emoji: '📐', colors: ['#f4a6ff', '#8a2be2'], ring: true },
+  { id: 'temps', name: 'Chronos', theme: 'Le temps', emoji: '⏰', colors: ['#9ff3e6', '#13867a'], ring: false },
 ];
 
 // « de » ou « d' » devant une voyelle : « d'autocollants », « d'œufs ».
@@ -742,24 +743,6 @@ const grandeurs = [
     },
   },
   {
-    id: 'g_clock', label: 'Lire l\'heure', minLevel: 1,
-    gen(L) {
-      const mins = L === 1 ? [0] : L === 2 ? [0, 30] : L <= 4 ? [0, 15, 30, 45] : [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
-      const h = rand(1, 12), m = pick(mins);
-      const opts = new Set([fmtTime(h, m)]);
-      // Pièges classiques : aiguilles inversées, heure voisine.
-      const swapH = m === 0 ? (h % 12) + 1 : Math.round(m / 5) || 12;
-      opts.add(fmtTime(h % 12 + 1, m));
-      if (m === 0) opts.add(fmtTime(h, 30)); else opts.add(fmtTime(swapH, (h * 5) % 60));
-      while (opts.size < 4) opts.add(fmtTime(rand(1, 12), pick(mins)));
-      return {
-        prompt: 'Quelle heure indique l\'horloge ?', visual: V.clock(h, m), type: 'choice', choices: shuffle([...opts]), answer: fmtTime(h, m),
-        hint: 'La petite aiguille indique les heures. La grande aiguille indique les minutes (sur le 6 : 30 minutes).',
-        explain: `Petite aiguille ${m ? 'après le ' : 'sur le '}${h}, grande aiguille ${m ? 'sur le ' + m / 5 : 'sur le 12'} : <b>${fmtTime(h, m)}</b>`,
-      };
-    },
-  },
-  {
     id: 'g_units', label: 'Choisir la bonne unité', minLevel: 1,
     gen(L) {
       const list = [
@@ -795,33 +778,15 @@ const grandeurs = [
     },
   },
   {
-    id: 'g_conv', label: 'Unités : 1 m = 100 cm, 1 h = 60 min…', minLevel: 3,
+    id: 'g_conv', label: 'Unités : 1 m = 100 cm, 1 kg = 1 000 g…', minLevel: 3,
     gen(L) {
-      const list = [['1 m', 'cm', 100], ['1 h', 'min', 60], ['1 jour', 'h', 24], ['1 semaine', 'jours', 7], ['1 €', 'centimes', 100]];
-      if (L >= 4) list.push(['2 m', 'cm', 200], ['1 kg', 'g', 1000], ['3 m', 'cm', 300], ['1 an', 'mois', 12]);
+      const list = [['1 m', 'cm', 100], ['1 €', 'centimes', 100], ['2 m', 'cm', 200]];
+      if (L >= 4) list.push(['1 kg', 'g', 1000], ['3 m', 'cm', 300], ['1 km', 'm', 1000]);
       const [a, unit, ans] = pick(list);
       return {
         prompt: `${a} = ? ${unit}`, say: `${a.replace('€', 'euro')}, c'est combien de ${unit} ?`, type: 'numpad', answer: ans, suffix: unit,
-        hint: 'C\'est une égalité à connaître par cœur. 1 m = 100 cm, 1 h = 60 min, 1 jour = 24 h, 1 semaine = 7 jours.',
-        explain: `${a} = <b>${ans} ${unit}</b>`,
-      };
-    },
-  },
-  {
-    id: 'g_duration', label: 'Calculer une durée', minLevel: 3,
-    gen(L) {
-      if (L >= 4 && chance(0.5)) {
-        const h = rand(8, 17), m1 = pick([0, 15]), d = pick([15, 30, 45].filter((x) => m1 + x < 60));
-        return {
-          prompt: `La séance de sport commence à ${fmtTime(h, m1)} et finit à ${fmtTime(h, m1 + d)}. Combien de minutes dure-t-elle ?`,
-          type: 'numpad', answer: d, suffix: 'min',
-          hint: 'Compte de 15 minutes en 15 minutes depuis le début.', explain: `De ${fmtTime(h, m1)} à ${fmtTime(h, m1 + d)} : <b>${d} minutes</b>`,
-        };
-      }
-      const h1 = rand(8, 18), d = rand(1, 4);
-      return {
-        prompt: `Le film commence à ${h1} h et finit à ${h1 + d} h. Combien d'heures dure-t-il ?`, type: 'numpad', answer: d, suffix: 'h',
-        hint: `Compte les heures : ${h1} h, ${h1 + 1} h…`, explain: `${h1 + d} − ${h1} = <b>${d} h</b>`,
+        hint: 'C\'est une égalité à connaître par cœur : 1 m = 100 cm, 1 € = 100 centimes, 1 kg = 1 000 g, 1 km = 1 000 m.',
+        explain: `${a} = <b>${fmt(ans)} ${unit}</b>`,
       };
     },
   },
@@ -850,22 +815,6 @@ const grandeurs = [
         }[s],
         explain: `C'est un <b>${s}</b>.`,
       };
-    },
-  },
-  {
-    id: 'g_calendar', label: 'Jours, mois et calendrier', minLevel: 1,
-    gen(L) {
-      const kind = pick(L >= 3 ? ['dayAfter', 'dayBefore', 'month', 'inDays'] : ['dayAfter', 'dayBefore', 'month']);
-      const list = kind === 'month' ? MONTHS : DAYS;
-      const i = rand(0, list.length - 1);
-      let q, ans, hint;
-      if (kind === 'dayAfter') { q = `Quel jour vient juste <b>après</b> ${list[i]} ?`; ans = list[(i + 1) % 7]; hint = 'Récite les jours : lundi, mardi, mercredi, jeudi, vendredi, samedi, dimanche.'; }
-      else if (kind === 'dayBefore') { q = `Quel jour vient juste <b>avant</b> ${list[i]} ?`; ans = list[(i + 6) % 7]; hint = 'Récite les jours dans l\'ordre et regarde celui qui est juste avant.'; }
-      else if (kind === 'month') { q = `Quel mois vient juste <b>après</b> ${list[i]} ?`; ans = list[(i + 1) % 12]; hint = 'Janvier, février, mars, avril, mai, juin, juillet, août, septembre, octobre, novembre, décembre.'; }
-      else { const k = rand(2, 5); q = `Aujourd'hui, c'est ${list[i]}. Quel jour serons-nous dans <b>${k} jours</b> ?`; ans = list[(i + k) % 7]; hint = `Avance de ${k} jours dans la semaine, un jour à la fois.`; }
-      const opts = new Set([ans]);
-      while (opts.size < 4) opts.add(pick(list));
-      return { prompt: q, type: 'choice', choices: shuffle([...opts]), answer: ans, hint, explain: `C'est <b>${ans}</b>.` };
     },
   },
   {
@@ -937,10 +886,139 @@ const grandeurs = [
   },
 ];
 
-const byPlanet = { nombres, calcul, problemes, grandeurs };
+// ---------------------------------------------------------------- Temps (Chronos)
+const MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+const temps = [
+  {
+    id: 't_clock', label: 'Lire l\'heure', minLevel: 1,
+    gen(L) {
+      const mins = L === 1 ? [0] : L === 2 ? [0, 30] : L <= 4 ? [0, 15, 30, 45] : [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
+      const h = rand(1, 12), m = pick(mins);
+      const opts = new Set([fmtTime(h, m)]);
+      // Pièges classiques : aiguilles inversées, heure voisine.
+      const swapH = m === 0 ? (h % 12) + 1 : Math.round(m / 5) || 12;
+      opts.add(fmtTime(h % 12 + 1, m));
+      if (m === 0) opts.add(fmtTime(h, 30)); else opts.add(fmtTime(swapH, (h * 5) % 60));
+      while (opts.size < 4) opts.add(fmtTime(rand(1, 12), pick(mins)));
+      return {
+        prompt: 'Quelle heure indique l\'horloge ?', visual: V.clock(h, m), type: 'choice', choices: shuffle([...opts]), answer: fmtTime(h, m),
+        hint: 'La petite aiguille indique les heures. La grande aiguille indique les minutes (sur le 6 : 30 minutes).',
+        explain: `Petite aiguille ${m ? 'après le ' : 'sur le '}${h}, grande aiguille ${m ? 'sur le ' + m / 5 : 'sur le 12'} : <b>${fmtTime(h, m)}</b>`,
+      };
+    },
+  },
+  {
+    id: 't_clock_pick', label: 'Trouver l\'horloge qui indique une heure', minLevel: 1,
+    gen(L) {
+      const mins = L === 1 ? [0] : L === 2 ? [0, 30] : [0, 15, 30, 45];
+      const h = rand(1, 12), m = pick(mins);
+      // Pièges : aiguilles inversées, heure voisine.
+      const swapped = m === 0 ? [h % 12 + 1, 0] : [Math.round(m / 5) || 12, (h * 5) % 60];
+      const cands = [[h, m], [h % 12 + 1, m], swapped, [h, m === 0 ? 30 : 0]];
+      const uniq = [...new Map(cands.map((c) => [c.join(':'), c])).values()].slice(0, 3);
+      while (uniq.length < 3) { const c = [rand(1, 12), pick(mins)]; if (!uniq.some((u) => u.join(':') === c.join(':'))) uniq.push(c); }
+      const order = shuffle(uniq), letters = ['A', 'B', 'C'];
+      const ans = letters[order.findIndex((c) => c[0] === h && c[1] === m)];
+      return {
+        prompt: `Quelle horloge indique <b>${fmtTime(h, m)}</b> ?`, visual: `<div class="clocks">${order.map((c, i) => `<div><span>${letters[i]}</span>${V.clock(...c)}</div>`).join('')}</div>`,
+        type: 'choice', choices: letters, answer: ans,
+        hint: 'La petite aiguille montre l\'heure, la grande aiguille montre les minutes.',
+        explain: `L'horloge <b>${ans}</b> : petite aiguille ${m ? 'après le' : 'sur le'} ${h}, grande aiguille sur le ${m ? m / 5 : 12}.`,
+      };
+    },
+  },
+  {
+    id: 't_compare', label: 'Estimer des durées', minLevel: 1,
+    gen() {
+      // [activité, durée en minutes, durée lisible]
+      const acts = [['se brosser les dents', 2, '2 minutes'], ['une récréation', 15, '15 minutes'], ['un repas', 40, '40 minutes'],
+        ['un film au cinéma', 120, '2 heures'], ['une nuit de sommeil', 600, '10 heures'], ['les grandes vacances', 86400, '2 mois'],
+        ['une année scolaire', 432000, '10 mois'], ['enfiler ses chaussures', 1, '1 minute'], ['une journée d\'école', 360, '6 heures']];
+      const chosen = sample(acts, 3), longest = chance(0.5);
+      const best = chosen.reduce((x, y) => ((longest ? y[1] > x[1] : y[1] < x[1]) ? y : x));
+      return {
+        prompt: `Qu'est-ce qui dure <b>le ${longest ? 'plus' : 'moins'} longtemps</b> ?`, type: 'choice', choices: chosen.map((x) => x[0]), answer: best[0],
+        hint: 'Imagine chaque activité : dure-t-elle quelques minutes, quelques heures, des jours, des mois ?',
+        explain: `${chosen.map((x) => `${x[0]} : ${x[2]}`).join(' · ')}<br>Réponse : <b>${best[0]}</b>`,
+      };
+    },
+  },
+  {
+    id: 't_calendar', label: 'Jours et mois', minLevel: 1,
+    gen(L) {
+      const kind = pick(L >= 3 ? ['dayAfter', 'dayBefore', 'month', 'inDays'] : ['dayAfter', 'dayBefore', 'month']);
+      const list = kind === 'month' ? MONTHS : DAYS;
+      const i = rand(0, list.length - 1);
+      let q, ans, hint;
+      if (kind === 'dayAfter') { q = `Quel jour vient juste <b>après</b> ${list[i]} ?`; ans = list[(i + 1) % 7]; hint = 'Récite les jours : lundi, mardi, mercredi, jeudi, vendredi, samedi, dimanche.'; }
+      else if (kind === 'dayBefore') { q = `Quel jour vient juste <b>avant</b> ${list[i]} ?`; ans = list[(i + 6) % 7]; hint = 'Récite les jours dans l\'ordre et regarde celui qui est juste avant.'; }
+      else if (kind === 'month') { q = `Quel mois vient juste <b>après</b> ${list[i]} ?`; ans = list[(i + 1) % 12]; hint = 'Janvier, février, mars, avril, mai, juin, juillet, août, septembre, octobre, novembre, décembre.'; }
+      else { const k = rand(2, 5); q = `Aujourd'hui, c'est ${list[i]}. Quel jour serons-nous dans <b>${k} jours</b> ?`; ans = list[(i + k) % 7]; hint = `Avance de ${k} jours dans la semaine, un jour à la fois.`; }
+      const opts = new Set([ans]);
+      while (opts.size < 4) opts.add(pick(list));
+      return { prompt: q, type: 'choice', choices: shuffle([...opts]), answer: ans, hint, explain: `C'est <b>${ans}</b>.` };
+    },
+  },
+  {
+    id: 't_units', label: 'Heures, minutes, jours, mois…', minLevel: 2,
+    gen(L) {
+      const list = [['1 heure', 'minutes', 60], ['1 jour', 'heures', 24], ['1 semaine', 'jours', 7], ['une demi-heure', 'minutes', 30], ['1 an', 'mois', 12]];
+      if (L >= 3) list.push(['un quart d\'heure', 'minutes', 15], ['1 minute', 'secondes', 60]);
+      if (L >= 4) list.push(['2 heures', 'minutes', 120], ['2 semaines', 'jours', 14], ['2 jours', 'heures', 48]);
+      const [a, unit, ans] = pick(list);
+      return {
+        prompt: `${a}, c'est combien de ${unit} ?`, type: 'numpad', answer: ans, suffix: unit === 'minutes' ? 'min' : unit === 'heures' ? 'h' : unit,
+        hint: 'À connaître par cœur : 1 h = 60 min, 1 jour = 24 h, 1 semaine = 7 jours, 1 an = 12 mois. Une demi-heure, c\'est la moitié d\'une heure.',
+        explain: `${a} = <b>${ans} ${unit}</b>`,
+      };
+    },
+  },
+  {
+    id: 't_duration', label: 'Calculer une durée', minLevel: 2,
+    gen(L) {
+      if (L >= 4 && chance(0.5)) {
+        const h = rand(8, 17), m1 = pick([0, 15]), d = pick([15, 30, 45].filter((x) => m1 + x < 60));
+        return {
+          prompt: `La séance de sport commence à ${fmtTime(h, m1)} et finit à ${fmtTime(h, m1 + d)}. Combien de minutes dure-t-elle ?`,
+          type: 'numpad', answer: d, suffix: 'min',
+          hint: 'Compte de 15 minutes en 15 minutes depuis le début.', explain: `De ${fmtTime(h, m1)} à ${fmtTime(h, m1 + d)} : <b>${d} minutes</b>`,
+        };
+      }
+      const h1 = rand(8, 18), d = rand(1, 4);
+      return {
+        prompt: `Le film commence à ${h1} h et finit à ${h1 + d} h. Combien d'heures dure-t-il ?`, type: 'numpad', answer: d, suffix: 'h',
+        hint: `Compte les heures : ${h1} h, ${h1 + 1} h…`, explain: `${h1 + d} − ${h1} = <b>${d} h</b>`,
+      };
+    },
+  },
+  {
+    id: 't_month', label: 'Lire un calendrier', minLevel: 3,
+    gen(L) {
+      const mi = rand(0, 11), nDays = MONTH_DAYS[mi], start = rand(0, 6);
+      const weekday = (day) => DAYS[(start + day - 1) % 7];
+      if (L >= 4 && chance(0.4)) {
+        const wd = rand(0, 6), count = Array.from({ length: nDays }, (_, i) => i + 1).filter((d) => (start + d - 1) % 7 === wd).length;
+        return {
+          prompt: `Combien y a-t-il de <b>${DAYS[wd]}s</b> en ${MONTHS[mi]} ?`, visual: V.month(MONTHS[mi], start, nDays), type: 'numpad', answer: count,
+          hint: `Regarde la colonne des ${DAYS[wd]}s et compte les dates.`, explain: `Il y a <b>${count} ${DAYS[wd]}s</b> en ${MONTHS[mi]}.`,
+        };
+      }
+      const d = rand(1, nDays);
+      return {
+        prompt: `Quel jour de la semaine est le <b>${d} ${MONTHS[mi]}</b> ?`, visual: V.month(MONTHS[mi], start, nDays, d), type: 'choice',
+        choices: shuffle([weekday(d), ...sample(DAYS.filter((x) => x !== weekday(d)), 3)]), answer: weekday(d),
+        hint: `Trouve la case du ${d}, puis remonte en haut de sa colonne.`,
+        explain: `Le ${d} ${MONTHS[mi]} est un <b>${weekday(d)}</b>.`,
+      };
+    },
+  },
+];
+
+const byPlanet = { nombres, calcul, problemes, grandeurs, temps };
 for (const [planet, list] of Object.entries(byPlanet)) for (const s of list) s.planet = planet;
 
-export const SKILLS = [...nombres, ...calcul, ...problemes, ...grandeurs];
+export const SKILLS = [...nombres, ...calcul, ...problemes, ...grandeurs, ...temps];
 export const SKILL_BY_ID = Object.fromEntries(SKILLS.map((s) => [s.id, s]));
 export const skillsFor = (planetId, level) => byPlanet[planetId].filter((s) => s.minLevel <= level);
 

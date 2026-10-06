@@ -14,12 +14,13 @@ export const ALIEN_NAMES = {
   nombres: ['Bloup', 'Dizou', 'Centi', 'Grobo', 'Millux'],
   calcul: ['Plussy', 'Moinsor', 'Foisy', 'Calcula', 'Opéron'],
   problemes: ['Énigmo', 'Questo', 'Rébus', 'Malino', 'Sphinxy'],
-  grandeurs: ['Mesuro', 'Horlo', 'Géomo', 'Kilox', 'Règlo'],
+  grandeurs: ['Mesuro', 'Équerro', 'Géomo', 'Kilox', 'Règlo'],
+  temps: ['Tic', 'Tac', 'Minuto', 'Horlox', 'Calendo'],
 };
 export const BOSS_NAMES = {
-  nombres: 'Capitaine Numéros', calcul: 'Général Éclair', problemes: 'Grand Énigmator', grandeurs: 'Reine Géométra',
+  nombres: 'Capitaine Numéros', calcul: 'Général Éclair', problemes: 'Grand Énigmator', grandeurs: 'Reine Géométra', temps: 'Maître du Temps',
 };
-export const ALIEN_COLORS = { nombres: '#ff9f43', calcul: '#4d8dff', problemes: '#3ddc84', grandeurs: '#c77dff' };
+export const ALIEN_COLORS = { nombres: '#ff9f43', calcul: '#4d8dff', problemes: '#3ddc84', grandeurs: '#c77dff', temps: '#2ec4b6' };
 
 export const ROCKETS = [
   { id: 'rouge', color: '#ff4d4d', name: 'Rouge', stars: 0 },
@@ -73,6 +74,12 @@ export function load() {
     const raw = localStorage.getItem(KEY);
     if (!raw) return d;
     const saved = JSON.parse(raw);
+    // Notions du temps déplacées de Géomia vers Chronos.
+    const renamed = { g_clock: 't_clock', g_calendar: 't_calendar', g_duration: 't_duration' };
+    for (const [from, to] of Object.entries(renamed)) {
+      if (saved.skills && saved.skills[from]) { saved.skills[to] = saved.skills[from]; delete saved.skills[from]; }
+      if (saved.review) saved.review = saved.review.map((id) => renamed[id] || id);
+    }
     const planets = Object.fromEntries(PLANETS.map((p) => [p.id, { ...d.planets[p.id], ...(saved.planets || {})[p.id] }]));
     return { ...d, ...saved, planets, records: { ...d.records, ...saved.records } };
   } catch {

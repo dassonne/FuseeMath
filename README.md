@@ -2,7 +2,7 @@
 
 Une application web ludique pour s'entraîner aux maths du CE1, sur téléphone, tablette ou ordinateur.
 
-L'enfant pilote une fusée et explore 4 planètes, une par domaine du programme :
+L'enfant pilote une fusée et explore 5 planètes, une par domaine du programme :
 
 Inspiré de MathHero : chaque mission est un combat contre un alien, chaque bonne réponse le touche avec un laser.
 
@@ -11,7 +11,8 @@ Inspiré de MathHero : chaque mission est un combat contre un alien, chaque bonn
 | 🟠 **Numéris** | Nombres | centaines/dizaines/unités, comparer, ranger, droite graduée, nombres en lettres, doubles et moitiés, fractions |
 | 🔵 **Calculo** | Calcul | calcul mental, compléments à 10 et à 100, ±10/±100, tables de 0 à 10 dans les deux sens, opérations posées |
 | 🟢 **Problémia** | Problèmes | ajout/retrait, parties d'un tout, comparaison, groupements, partages, deux étapes, corrigés avec schémas en barres |
-| 🟣 **Géomia** | Mesures, temps & géométrie | monnaie, heure, durées, jours et mois, règle graduée, unités, figures, solides, quadrillage, angle droit |
+| 🟣 **Géomia** | Mesures & géométrie | monnaie, règle graduée, unités (m, cm, kg, g), figures, solides, quadrillage, angle droit |
+| 🩵 **Chronos** | Le temps | lire l'heure, trouver la bonne horloge, durées, estimer des durées, jours et mois, lire un calendrier, 1 h = 60 min… |
 
 ### Programme 2025 et livret d'accompagnement CE1 (éduscol)
 
@@ -32,7 +33,7 @@ Les contenus suivent le programme de mathématiques 2025 et les quatre séquence
   - Sur Calculo, **Défi éclair** : 12 calculs en 3 minutes, 10 réussis pour gagner (le chronomètre peut être désactivé).
 - **Objectif du jour :** 3 missions (environ 10-15 minutes).
 - **Défis & jeux** (entraînement libre, sans changer de niveau) : Défi éclair, Défi tables, Memory des fractions, avec records.
-- **Récompenses :** étoiles, fusées à débloquer, album de 40 aliens et boss, trophées.
+- **Récompenses :** étoiles, fusées à débloquer, album de 50 aliens et boss, trophées.
 - **Lecture audio** des consignes (bouton 🔊, ou lecture automatique dans l'espace parents).
 - **Espace parents** protégé par un code à 4 chiffres : réussite par notion, notions à revoir, historique, niveaux, choix des tables de multiplication, chronomètre.
 - **Pas de compte, pas de serveur :** la progression reste dans le navigateur de l'appareil (non partagée entre téléphone et PC).
