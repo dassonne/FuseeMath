@@ -62,6 +62,23 @@ export function numChoices(answer, spread = 10, count = 4, min = 0) {
 
 export const NAMES = ['Léo', 'Inès', 'Tom', 'Jade', 'Sami', 'Lina', 'Hugo', 'Emma', 'Noah', 'Chloé', 'Adam', 'Lou'];
 
-export const todayStr = () => new Date().toISOString().slice(0, 10);
+// Date locale (et non UTC) au format AAAA-MM-JJ.
+export function dayStr(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+export const todayStr = () => dayStr();
 
 export const escapeHtml = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// Fractions : lecture « un cinquième », « trois quarts » (jamais « un sur cinq »).
+const ORDINALS = { 2: 'demi', 3: 'tiers', 4: 'quart', 5: 'cinquième', 6: 'sixième', 8: 'huitième', 10: 'dixième' };
+export function fractionWords(n, d) {
+  if (n === d) return 'un';
+  const ord = ORDINALS[d];
+  if (n === 1) return `un ${ord}`;
+  const plural = d === 3 ? 'tiers' : d === 2 ? 'demis' : ord + 's';
+  return `${toWords(n)} ${plural}`;
+}
+
+// Écriture fractionnaire « en chiffres » : 1 au-dessus, 5 en dessous.
+export const fracHtml = (n, d) => `<span class="fr"><span>${n}</span><span>${d}</span></span>`;

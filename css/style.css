@@ -383,3 +383,42 @@ table.column { font-size: 2em; font-weight: 800; border-collapse: collapse; font
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* Fractions en écriture chiffrée */
+.fr { display: inline-flex; flex-direction: column; align-items: center; vertical-align: middle; line-height: 1; margin: 0 .15em; font-weight: 800; }
+.fr span:first-child { border-bottom: .09em solid currentColor; padding: 0 .15em .06em; }
+.fr span:last-child { padding-top: .06em; }
+.frac-pair { display: flex; gap: 12px; justify-content: center; margin-top: 10px; }
+.frac-pair .frac { width: 45%; max-width: 160px; }
+.choices.symbols .fr { font-size: .8em; }
+
+/* Défis & jeux */
+.defis-title { margin: 22px 0 10px; text-align: center; color: #e3e0ff; font-size: 1.1em; }
+.defis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.defis button { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 10px 6px; border-radius: var(--radius); background: #ffffff12; border: 2px solid #ffffff22; color: #fff; text-align: center; }
+.defis button span { font-size: 1.8em; }
+.defis button small { color: #d6d2ff; font-size: .72em; line-height: 1.2; }
+.defis button .rec { color: #ffd23f; margin-top: 3px; }
+.defis button:disabled { opacity: .45; }
+
+/* Memory */
+.memory-wrap { max-width: 560px; margin: 0 auto; padding: 0 12px; }
+.mem-help { text-align: center; color: #e3e0ff; margin: 4px 0 12px; }
+.memory { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+@media (min-width: 560px) { .memory { grid-template-columns: repeat(4, 1fr); } }
+.mem-card { position: relative; aspect-ratio: 1; border-radius: 16px; perspective: 600px; }
+.mem-back, .mem-face { position: absolute; inset: 0; display: grid; place-items: center; border-radius: 16px; backface-visibility: hidden; transition: transform .35s; }
+.mem-back { background: linear-gradient(135deg, #5b3fd1, #8a2be2); font-size: 2em; font-weight: 800; color: #ffffffaa; border: 3px solid #ffffff33; }
+.mem-face { background: #fff; color: var(--ink); transform: rotateY(180deg); padding: 8px; }
+.mem-face .frac { width: 100%; height: 100%; }
+.mem-txt { font-size: 1.15em; font-weight: 800; text-align: center; line-height: 1.1; }
+.mem-txt .fr { font-size: 1.6em; }
+.mem-card.up .mem-back, .mem-card.done .mem-back { transform: rotateY(180deg); }
+.mem-card.up .mem-face, .mem-card.done .mem-face { transform: rotateY(360deg); }
+.mem-card.done .mem-face { box-shadow: 0 0 0 4px var(--good); }
+
+/* Parents : maîtrise des tables */
+.mastery { display: grid; gap: 4px; margin: 8px 0; }
+.m-row { display: grid; grid-template-columns: 36px 1fr 40px; align-items: center; gap: 8px; font-weight: 700; }
+.m-bar { height: 10px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.m-bar div { height: 100%; background: var(--good); }

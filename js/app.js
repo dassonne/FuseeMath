@@ -1,7 +1,7 @@
-import { PLANETS, SKILLS, buildMission, buildFlash, NUM_MAX, TABLES_BY_LEVEL } from './skills.js';
+import { PLANETS, SKILLS, buildMission, buildFlash, NUM_MAX, TABLES_BY_LEVEL, tablesQuestion, factKey } from './skills.js';
 import * as Store from './store.js';
-import { rocket, planet, numberLine, alien } from './visuals.js';
-import { pick, escapeHtml, fmt } from './util.js';
+import { rocket, planet, numberLine, alien, fraction } from './visuals.js';
+import { pick, shuffle, sample, escapeHtml, fmt, fractionWords, fracHtml } from './util.js';
 
 const app = document.getElementById('app');
 let state = Store.load();
@@ -35,7 +35,11 @@ const sfx = {
 };
 
 function toSpeech(html) {
-  const txt = html.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ');
+  // Une fraction se lit « un cinquième », jamais « un sur cinq ».
+  const txt = html
+    .replace(/<span class="fr"><span>(\d+)<\/span><span>(\d+)<\/span><\/span>/g, (m, n, d) => ` ${fractionWords(Number(n), Number(d))} `)
+    .replace(/\b(\d+)\/(\d+)\b/g, (m, n, d) => fractionWords(Number(n), Number(d)))
+    .replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ');
   return txt
     .replace(/(\d) (\d)/g, '$1$2')
     .replace(/×/g, ' fois ').replace(/−/g, ' moins ').replace(/\+/g, ' plus ')
@@ -145,6 +149,12 @@ function renderHome() {
         }).join('')}
       </div>
       <button class="btn mix" data-planet="">🌌 Mission mélange <small>un peu de tout</small></button>
+      <h3 class="defis-title">Défis & jeux</h3>
+      <div class="defis">
+        <button data-arcade="flash"><span>⚡</span><b>Défi éclair</b><small>12 calculs · 3 min</small><small class="rec">${state.records.flash ? `Record : ${state.records.flash}/12` : 'Pas encore de record'}</small></button>
+        <button data-arcade="tables"><span>✖️</span><b>Défi tables</b><small>1 minute · objectif ${Store.TABLES_CHALLENGE.goal}</small><small class="rec">${state.records.tables ? `Record : ${state.records.tables}` : 'Pas encore de record'}</small></button>
+        <button data-arcade="memory" ${memoryOpen() ? '' : 'disabled'}><span>🃏</span><b>Memory</b><small>des fractions</small><small class="rec">${!memoryOpen() ? '🔒 Numéris niveau 2' : state.records.memory ? `Record : ${state.records.memory} coups` : 'Pas encore de record'}</small></button>
+      </div>
     </main>
     ${nav('home')}`, 'space');
   app.querySelectorAll('[data-planet]').forEach((b) => b.addEventListener('click', () => {
@@ -152,7 +162,118 @@ function renderHome() {
     if (id && Store.bossReady(state.planets[id])) renderBossIntro(id);
     else startMission(id, 'normal');
   }));
+  app.querySelectorAll('[data-arcade]').forEach((b) => b.addEventListener('click', () => {
+    if (b.dataset.arcade === 'memory') renderMemory(); else startArcade(b.dataset.arcade);
+  }));
 }
+
+const memoryOpen = () => state.planets.nombres.level >= 2;
+const tablesLevel = () => state.planets.calcul.level;
+
+// ------------------------------------------------------------------ Défis (entraînement libre, sans changer de niveau)
+function startArcade(kind) {
+  const tables = kind === 'tables';
+  const foe = { id: null, planet: 'calcul', level: 3, boss: false, name: tables ? 'Multiplix' : 'Zappy', color: tables ? '#ff5c7a' : '#ffd23f' };
+  const opts = { tables: state.tables };
+  const questions = tables ? [tablesQuestion(tablesLevel(), opts, state.facts)] : buildFlash(tablesLevel(), Store.FLASH.size, opts);
+  mission = { planetId: null, kind, arcade: true, questions, idx: 0, attempts: 0, score: 0, hits: 0, results: [], foe, deadline: null, timer: null };
+  const timed = tables || state.flashTimer;
+  screen(`
+    <main class="launch boss-intro">
+      <div class="boss-big">${foeSvg(foe, 130)}</div>
+      <h2>${tables ? 'Défi tables' : 'Défi éclair'}</h2>
+      <p class="rule">${tables
+        ? `✖️ Trouve un maximum de résultats des tables en <b>1 minute</b>. Objectif : ${Store.TABLES_CHALLENGE.goal} !`
+        : `⚡ ${Store.FLASH.size} calculs${timed ? ' en <b>3 minutes</b>' : ''}. Objectif : ${Store.FLASH.toWin} justes !`}</p>
+      <p class="small">${state.records[kind] ? `Ton record : ${state.records[kind]}` : 'Premier essai : bonne chance !'}</p>
+      <div class="result-actions">
+        <button class="btn primary big" id="go">Partez ! 🚀</button>
+        <button class="btn" data-go="home">Retour</button>
+      </div>
+    </main>`, 'space');
+  app.querySelector('#go').addEventListener('click', () => {
+    if (timed) {
+      mission.deadline = Date.now() + (tables ? Store.TABLES_CHALLENGE.seconds : Store.FLASH.seconds) * 1000;
+      mission.timer = setInterval(tick, 250);
+    }
+    renderQuestion();
+  });
+}
+
+// ------------------------------------------------------------------ Memory des fractions (livret CE1, séquence 1)
+function memoryCards() {
+  const L = state.planets.nombres.level;
+  const pool = [2, 3, 4, 5, 6, 8, 10].map((d) => [1, d]);
+  if (L >= 3) pool.push([2, 3], [3, 4], [2, 5], [3, 5], [5, 6], [3, 8], [3, 10], [7, 10]);
+  const chosen = sample(pool, 6);
+  const kinds = { 2: ['disc', 'square', 'rect', 'fan'], 4: ['disc', 'square', 'rect'], 8: ['disc', 'square', 'rect'], 3: ['disc', 'hex', 'rect'], 6: ['disc', 'hex', 'rect'] };
+  const cards = [];
+  for (const [n, d] of chosen) {
+    const key = `${n}/${d}`;
+    cards.push({ key, face: fraction(d, pick(kinds[d] || ['disc', 'rect']), n) });
+    cards.push({ key, face: `<span class="mem-txt">${pick([true, false]) ? fracHtml(n, d) : fractionWords(n, d)}</span>` });
+  }
+  return shuffle(cards);
+}
+
+function renderMemory() {
+  const cards = memoryCards();
+  if (window.__state) window.__memoryCards = cards; // accès de test (?debug)
+  let open = [], moves = 0, found = 0, busy = false;
+  screen(`
+    <header class="mission-top"><button class="close" data-go="home" aria-label="quitter">✕</button>
+      <div class="progress"><span>🃏 Memory des fractions</span><span class="moves">0 coup</span></div></header>
+    <main class="memory-wrap">
+      <p class="mem-help">Retourne deux cartes : associe chaque dessin à sa fraction.</p>
+      <div class="memory">${cards.map((c, i) => `<button class="mem-card" data-i="${i}" aria-label="carte"><div class="mem-back">?</div><div class="mem-face">${c.face}</div></button>`).join('')}</div>
+    </main>`, 'mission');
+  const els = [...app.querySelectorAll('.mem-card')];
+  els.forEach((el) => el.addEventListener('click', () => {
+    const i = Number(el.dataset.i);
+    if (busy || el.classList.contains('up') || el.classList.contains('done')) return;
+    el.classList.add('up');
+    open.push(i);
+    if (open.length < 2) return;
+    moves++;
+    app.querySelector('.moves').textContent = `${moves} coup${moves > 1 ? 's' : ''}`;
+    const [a, b] = open;
+    open = [];
+    if (cards[a].key === cards[b].key) {
+      sfx.good();
+      [a, b].forEach((k) => els[k].classList.add('done'));
+      const [n, d] = cards[a].key.split('/').map(Number);
+      if (state.sound) speak(fractionWords(n, d));
+      if (++found === cards.length / 2) setTimeout(() => memoryResult(moves, cards.length / 2), 900);
+    } else {
+      busy = true;
+      setTimeout(() => { [a, b].forEach((k) => els[k].classList.remove('up')); busy = false; }, 1100);
+    }
+  }));
+}
+
+function memoryResult(moves, pairs) {
+  const out = Store.finishArcade(state, { game: 'memory', score: moves, total: pairs });
+  persist();
+  sfx.win();
+  screen(`
+    <main class="result">
+      <h2>Memory terminé !</h2>
+      <p>Tu as trouvé les ${pairs} paires en <b>${moves} coups</b>.</p>
+      <div class="big-stars">${[1, 2, 3].map((i) => `<span class="${i <= out.stars ? 'on' : ''}" style="animation-delay:${i * 0.25}s">★</span>`).join('')}</div>
+      ${out.record && out.prev ? '<div class="banner level">🏆 Nouveau record !</div>' : ''}
+      ${arcadeBanners(out)}
+      <div class="result-actions">
+        <button class="btn primary big" id="again">Rejouer 🃏</button>
+        <button class="btn" data-go="home">Retour à la carte</button>
+      </div>
+    </main>`, 'space');
+  app.querySelector('#again').addEventListener('click', renderMemory);
+}
+
+const arcadeBanners = (out) => `
+  ${out.goalReached ? '<div class="banner badge">✅ Objectif du jour atteint !</div>' : ''}
+  ${out.newBadges.map((b) => `<div class="banner badge">${b.icon} Nouveau trophée : <b>${b.name}</b></div>`).join('')}
+  ${out.newRockets.map((r) => `<div class="banner badge">${rocket(r.color, 28)} Nouvelle fusée débloquée : <b>${r.name}</b> !</div>`).join('')}`;
 
 // ------------------------------------------------------------------ Missions & combats
 function makeFoe(planetId, kind) {
@@ -216,7 +337,7 @@ function tick() {
   if (!mission || !mission.deadline) return;
   const left = Math.max(0, Math.ceil((mission.deadline - Date.now()) / 1000));
   const el = app.querySelector('.timer');
-  if (el) { el.textContent = `⏱ ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`; el.classList.toggle('urgent', left <= 30); }
+  if (el) { el.textContent = `⏱ ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`; el.classList.toggle('urgent', left <= (mission.kind === 'tables' ? 10 : 30)); }
   if (left === 0) { clearTimeout(nextTimer); renderResult(); }
 }
 
@@ -227,7 +348,7 @@ function stopMission() {
 }
 
 function arena() {
-  const f = mission.foe, total = mission.questions.length;
+  const f = mission.foe, total = foeHp();
   const hp = Math.max(0, total - mission.hits);
   return `<div class="arena">
     <div class="hero">${rocket(rocketColor(), 54)}</div>
@@ -237,10 +358,17 @@ function arena() {
   </div>`;
 }
 
+// Points de vie de l'adversaire : une bonne réponse = un point (objectif 8 pour le Défi tables).
+const foeHp = () => (mission.kind === 'tables' ? Store.TABLES_CHALLENGE.goal : mission.questions.length);
+
 function progressBar() {
   const n = mission.questions.length;
-  return `<div class="progress"><span>${mission.idx + 1}/${n}</span>${mission.deadline ? '<span class="timer"></span>' : ''}</div>`;
+  const left = mission.kind === 'tables' ? `<span>✓ ${mission.score}</span>` : `<span>${mission.idx + 1}/${n}</span>`;
+  return `<div class="progress">${left}${mission.deadline ? '<span class="timer"></span>' : ''}</div>`;
 }
+
+// « 3/4 » s'affiche en écriture fractionnaire.
+const choiceLabel = (c) => (/^\d+\/\d+$/.test(c) ? fracHtml(...c.split('/')) : escapeHtml(c));
 
 function answerArea(q) {
   switch (q.type) {
@@ -249,7 +377,7 @@ function answerArea(q) {
         <div class="numpad">${[7, 8, 9, 4, 5, 6, 1, 2, 3].map((d) => `<button data-k="${d}">${d}</button>`).join('')}
         <button data-k="del" aria-label="effacer">⌫</button><button data-k="0">0</button><button data-k="ok" class="ok" aria-label="valider">✓</button></div>`;
     case 'choice':
-      return `<div class="choices ${q.choices.every((c) => c.length <= 2) ? 'symbols' : ''}" style="--n:${Math.min(4, q.choices.length)}">${q.choices.map((c) => `<button data-c="${escapeHtml(c)}">${escapeHtml(c)}</button>`).join('')}</div>`;
+      return `<div class="choices ${q.choices.every((c) => c.length <= 2 || /^\d+\/\d+$/.test(c)) ? 'symbols' : ''}" style="--n:${Math.min(4, q.choices.length)}">${q.choices.map((c) => `<button data-c="${escapeHtml(c)}">${choiceLabel(c)}</button>`).join('')}</div>`;
     case 'order':
       return `<div class="slots">${q.items.map(() => '<button class="slot-btn empty"></button>').join('')}</div>
         <div class="chips">${q.items.map((n, i) => `<button class="chip" data-i="${i}">${fmt(n)}</button>`).join('')}</div>
@@ -371,7 +499,7 @@ function animate(el, cls) {
 
 function hitFoe() {
   mission.hits++;
-  const total = mission.questions.length;
+  const total = foeHp();
   const fill = app.querySelector('.hp-fill');
   if (fill) fill.style.width = `${(Math.max(0, total - mission.hits) / total) * 100}%`;
   animate(app.querySelector('.arena'), 'shoot');
@@ -390,20 +518,23 @@ function check(ok, resetInput) {
   const q = mission.questions[mission.idx];
   const fb = app.querySelector('.feedback');
   const card = app.querySelector('.q-card');
-  const flash = mission.kind === 'flash';
+  const flash = mission.kind === 'flash' || mission.kind === 'tables';
   if (ok) {
     locked = true;
     const first = mission.attempts === 0;
     if (first) mission.score++;
     mission.results.push(first);
     Store.recordAnswer(state, q.skill, first);
+    Store.recordFact(state, q.fact, first);
     persist();
     sfx.good();
+    // Associer à l'oral l'opération et son résultat : « 3 fois 7, 21 ».
+    if (q.fact && state.sound) speak(`${q.fact[0]} fois ${q.fact[1]}, ${q.fact[0] * q.fact[1]}`);
     hitFoe();
     card.classList.add('win');
     fb.className = 'feedback good';
     fb.innerHTML = `<b>${pick(BRAVO)}</b> ${first ? '⭐' : ''}`;
-    nextTimer = setTimeout(next, flash ? 650 : 1200);
+    nextTimer = setTimeout(next, flash ? (q.fact && state.sound ? 1300 : 650) : 1200);
     return;
   }
   sfx.bad();
@@ -419,6 +550,7 @@ function check(ok, resetInput) {
   locked = true;
   mission.results.push(false);
   Store.recordAnswer(state, q.skill, false);
+  Store.recordFact(state, q.fact, false);
   persist();
   fb.className = 'feedback explain';
   if (flash) {
@@ -435,6 +567,10 @@ function next() {
   if (!mission) return;
   locked = false;
   mission.idx++;
+  if (mission.kind === 'tables') {
+    const last = mission.questions[mission.idx - 1];
+    mission.questions.push(tablesQuestion(tablesLevel(), { tables: state.tables }, state.facts, factKey(...last.fact)));
+  }
   if (mission.idx < mission.questions.length) renderQuestion();
   else renderResult();
 }
@@ -442,6 +578,7 @@ function next() {
 function renderResult() {
   if (!mission) return;
   stopMission();
+  if (mission.arcade) return arcadeResult();
   const { planetId, kind, score, results, foe } = mission;
   const total = mission.questions.length;
   const won = kind === 'normal' ? mission.hits === total
@@ -483,6 +620,33 @@ function renderResult() {
     if (planetId && Store.bossReady(state.planets[planetId])) renderBossIntro(planetId);
     else startMission(planetId, 'normal');
   });
+  mission = null;
+}
+
+function arcadeResult() {
+  const { kind, score, results, foe } = mission;
+  const tables = kind === 'tables';
+  const total = tables ? results.length : mission.questions.length;
+  const goal = tables ? Store.TABLES_CHALLENGE.goal : Store.FLASH.toWin;
+  const out = Store.finishArcade(state, { game: kind, score, total });
+  persist();
+  const won = score >= goal;
+  if (won) sfx.win(); else sfx.bad();
+  screen(`
+    <main class="result">
+      <h2>${won ? 'Défi réussi !' : 'Bien essayé !'}</h2>
+      <div class="foe-result ${won ? 'caught' : 'fled'}">${foeSvg(foe, 100)}</div>
+      <p>${tables ? `Tu as trouvé <b>${score}</b> résultat${score > 1 ? 's' : ''} en 1 minute.` : `<b>${score}</b> calcul${score > 1 ? 's' : ''} juste${score > 1 ? 's' : ''} sur ${total}.`}
+        ${won ? '' : `L'objectif est ${goal} : entraîne-toi un peu chaque jour !`}</p>
+      <div class="big-stars">${[1, 2, 3].map((i) => `<span class="${i <= out.stars ? 'on' : ''}" style="animation-delay:${i * 0.25}s">★</span>`).join('')}</div>
+      ${out.record && out.prev ? `<div class="banner level">🏆 Nouveau record ! (avant : ${out.prev})</div>` : ''}
+      ${arcadeBanners(out)}
+      <div class="result-actions">
+        <button class="btn primary big" id="again">Rejouer ${tables ? '✖️' : '⚡'}</button>
+        <button class="btn" data-go="home">Retour à la carte</button>
+      </div>
+    </main>`, 'space');
+  app.querySelector('#again').addEventListener('click', () => startArcade(kind));
   mission = null;
 }
 
@@ -596,6 +760,16 @@ function renderParent() {
         <div class="tables ${customTables ? '' : 'disabled'}">${[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((t) =>
           `<label class="tbl ${tablesShown.includes(t) ? 'on' : ''}"><input type="checkbox" value="${t}" ${tablesShown.includes(t) ? 'checked' : ''} ${customTables ? '' : 'disabled'}>×${t}</label>`).join('')}</div>
         <label class="row"><input type="checkbox" id="flashTimer" ${state.flashTimer ? 'checked' : ''}> Chronomètre pour le Défi éclair (3 minutes)</label>
+        <p class="note">Mémorisation : un résultat est « sûr » après plusieurs bonnes réponses du premier coup ; une erreur le fait revenir plus souvent (récupération espacée). Records : Défi tables ${state.records.tables || 0} (objectif ${Store.TABLES_CHALLENGE.goal} en 1 min), Défi éclair ${state.records.flash || 0}/12.</p>
+        <div class="mastery">${[2, 3, 4, 5, 6, 7, 8, 9].map((t) => {
+          const keys = Array.from({ length: 10 }, (_, i) => factKey(t, i + 1));
+          const sure = keys.filter((k) => state.facts[k] && state.facts[k].box >= 3).length;
+          return `<div class="m-row"><span>×${t}</span><div class="m-bar"><div style="width:${sure * 10}%"></div></div><small>${sure}/10</small></div>`;
+        }).join('')}</div>
+        ${(() => {
+          const weak = Object.entries(state.facts).filter(([, f]) => f.box === 0 && f.seen > 0).map(([k]) => k.replace('x', ' × '));
+          return weak.length ? `<p class="note">À revoir : <b>${weak.slice(0, 12).join(', ')}</b></p>` : '';
+        })()}
       </section>
 
       <section>

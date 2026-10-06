@@ -13,7 +13,15 @@ Inspiré de MathHero : chaque mission est un combat contre un alien, chaque bonn
 | 🟢 **Problémia** | Problèmes | ajout/retrait, parties d'un tout, comparaison, groupements, partages, deux étapes, corrigés avec schémas en barres |
 | 🟣 **Géomia** | Mesures & géométrie | monnaie, heure, durées, calendrier, règle graduée, unités, figures, solides, quadrillage, angle droit, fractions unitaires |
 
-Contenus alignés sur le programme de mathématiques 2025 du CE1 : nombres jusqu'à 1 000 dès la période 2, fractions unitaires (demi, tiers, quart… jusqu'au dixième) dès la période 2, tables de 0 à 10 en fin d'année, fluence de 12 calculs en 3 minutes ; pas de contenances (vues en CE2).
+### Programme 2025 et livret d'accompagnement CE1 (éduscol)
+
+Les contenus suivent le programme de mathématiques 2025 et les quatre séquences du livret d'accompagnement CE1 :
+
+- **Fractions** : moitié, demi et quart en période 1 ; fractions unitaires (demi → dixième) et **écriture chiffrée** en période 2 ; fractions non unitaires en période 3 ; comparaison et addition de fractions de même dénominateur en période 4. Les fractions se lisent « un cinquième », jamais « un sur cinq » (la lecture vocale le respecte). Pièges de partages en parts inégales, et **memory des fractions** comme dans le livret.
+- **Calcul mental** : ajouter 9, 19, 29 (« ajouter 20 puis enlever 1 », sauf si le nombre finit par 0 ou 1), soustraire 9. Fluence : **12 calculs en 3 minutes** (Défi éclair).
+- **Tables** : tables de 1 à 6 et 10 en périodes 1-2, table de 7 en période 3, table de 8 en période 4, toutes en période 5 ; multiplier par 10 ; 11 à 19 × un petit nombre. Indices par stratégie (commutativité, double, 10 fois moins 1 fois). Le résultat est dit à voix haute (« 3 fois 7, 21 »). **Défi tables : 8 résultats en 1 minute**, avec récupération espacée des faits fragiles.
+- **Problèmes parties-tout** : recherche du tout ou d'une partie, de l'état final, de la transformation ou de l'état initial ; schéma en barres dans les corrections ; question « Quel calcul permet de répondre ? » pour l'étape de modélisation.
+- Pas de contenances (vues en CE2).
 
 ## Fonctionnement
 
@@ -23,6 +31,7 @@ Contenus alignés sur le programme de mathématiques 2025 du CE1 : nombres jusqu
   - Boss classique : 8 défis, 6 réussis du premier coup pour gagner.
   - Sur Calculo, **Défi éclair** : 12 calculs en 3 minutes, 10 réussis pour gagner (le chronomètre peut être désactivé).
 - **Objectif du jour :** 3 missions (environ 10-15 minutes).
+- **Défis & jeux** (entraînement libre, sans changer de niveau) : Défi éclair, Défi tables, Memory des fractions, avec records.
 - **Récompenses :** étoiles, fusées à débloquer, album de 40 aliens et boss, trophées.
 - **Lecture audio** des consignes (bouton 🔊, ou lecture automatique dans l'espace parents).
 - **Espace parents** protégé par un code à 4 chiffres : réussite par notion, notions à revoir, historique, niveaux, choix des tables de multiplication, chronomètre.

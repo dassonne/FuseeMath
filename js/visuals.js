@@ -81,22 +81,54 @@ export function shape(name, color = '#ff8a3d') {
   return `<svg class="vis shape" viewBox="0 0 200 160" role="img" aria-label="figure">${svg}</svg>`;
 }
 
-// Figure partagée en `parts` parts égales, une seule coloriée.
-export function fraction(parts, kind = 'rect') {
-  if (kind === 'disc') {
-    let s = '';
+// Figure partagée en `parts` parts (égales sauf si `unequal`), dont `colored` sont coloriées.
+// kind : 'rect' (bande), 'disc', 'square' (carré quadrillé), 'hex' (hexagone), 'fan' (éventail).
+export function fraction(parts, kind = 'rect', colored = 1, unequal = false) {
+  const cls = (i) => (i < colored ? 'frac-on' : 'frac-off');
+  let s = '', vb = '-3 -3 246 96';
+  if (kind === 'disc' || kind === 'fan') {
+    const fan = kind === 'fan', cx = 80, cy = fan ? 90 : 80, r = 70;
+    const span = fan ? Math.PI : 2 * Math.PI, start = fan ? Math.PI : -Math.PI / 2;
+    const cuts = unequalCuts(parts, unequal);
     for (let i = 0; i < parts; i++) {
-      const a1 = (i * 2 * Math.PI) / parts - Math.PI / 2, a2 = ((i + 1) * 2 * Math.PI) / parts - Math.PI / 2;
-      const p1 = [80 + 70 * Math.cos(a1), 80 + 70 * Math.sin(a1)], p2 = [80 + 70 * Math.cos(a2), 80 + 70 * Math.sin(a2)];
-      const large = parts === 1 ? 1 : 0;
-      s += `<path d="M80,80 L${p1[0]},${p1[1]} A70,70 0 ${large} 1 ${p2[0]},${p2[1]} Z" class="${i === 0 ? 'frac-on' : 'frac-off'}"/>`;
+      const a1 = start + cuts[i] * span, a2 = start + cuts[i + 1] * span;
+      const p1 = [cx + r * Math.cos(a1), cy + r * Math.sin(a1)], p2 = [cx + r * Math.cos(a2), cy + r * Math.sin(a2)];
+      const large = a2 - a1 > Math.PI ? 1 : 0;
+      s += parts === 1 && !fan ? `<circle cx="${cx}" cy="${cy}" r="${r}" class="${cls(i)}"/>`
+        : `<path d="M${cx},${cy} L${p1} A${r},${r} 0 ${large} 1 ${p2} Z" class="${cls(i)}"/>`;
     }
-    return `<svg class="vis frac" viewBox="0 0 160 160" role="img" aria-label="disque partagé">${s}</svg>`;
+    vb = fan ? '0 10 160 90' : '0 0 160 160';
+    return `<svg class="vis frac" viewBox="${vb}" role="img" aria-label="figure partagée">${s}</svg>`;
   }
-  const w = 240 / parts;
-  let s = '';
-  for (let i = 0; i < parts; i++) s += `<rect x="${i * w}" y="0" width="${w}" height="90" class="${i === 0 ? 'frac-on' : 'frac-off'}"/>`;
-  return `<svg class="vis frac" viewBox="-3 -3 246 96" role="img" aria-label="rectangle partagé">${s}</svg>`;
+  if (kind === 'hex' && (parts === 6 || parts === 3)) {
+    const pt = (k) => [80 + 70 * Math.cos((Math.PI / 3) * k), 75 + 70 * Math.sin((Math.PI / 3) * k)];
+    const step = 6 / parts;
+    for (let i = 0; i < parts; i++) {
+      const pts = [[80, 75]];
+      for (let k = i * step; k <= (i + 1) * step; k++) pts.push(pt(k));
+      s += `<polygon points="${pts.map((p) => p.join(',')).join(' ')}" class="${cls(i)}"/>`;
+    }
+    return `<svg class="vis frac" viewBox="5 0 150 150" role="img" aria-label="hexagone partagé">${s}</svg>`;
+  }
+  if (kind === 'square' && [2, 4, 8].includes(parts) && !unequal) {
+    const cols = parts === 8 ? 4 : 2, rows = parts === 2 ? 1 : 2, w = 140 / cols, h = 140 / rows;
+    for (let i = 0; i < parts; i++) s += `<rect x="${(i % cols) * w}" y="${Math.floor(i / cols) * h}" width="${w}" height="${h}" class="${cls(i)}"/>`;
+    return `<svg class="vis frac" viewBox="-3 -3 146 146" role="img" aria-label="carré partagé">${s}</svg>`;
+  }
+  const cuts = unequalCuts(parts, unequal);
+  for (let i = 0; i < parts; i++) s += `<rect x="${cuts[i] * 240}" y="0" width="${(cuts[i + 1] - cuts[i]) * 240}" height="90" class="${cls(i)}"/>`;
+  return `<svg class="vis frac" viewBox="${vb}" role="img" aria-label="bande partagée">${s}</svg>`;
+}
+
+// Positions des coupes (de 0 à 1) : régulières, ou volontairement inégales pour les pièges.
+function unequalCuts(parts, unequal) {
+  const cuts = Array.from({ length: parts + 1 }, (_, i) => i / parts);
+  if (unequal && parts >= 2) {
+    // Une part nettement plus grande que les autres.
+    const big = 0.5 + 0.1 * (parts === 2 ? 1 : 0);
+    for (let i = 1; i < parts; i++) cuts[i] = big + ((1 - big) * (i - 1)) / (parts - 1);
+  }
+  return cuts;
 }
 
 // Collections d'objets regroupés (pour les multiplications / partages).

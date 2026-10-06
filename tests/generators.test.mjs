@@ -1,6 +1,6 @@
 // Génère beaucoup d'exercices à chaque niveau et vérifie leur cohérence.
 // Lancer : node tests/generators.test.mjs
-import { SKILLS, NUM_MAX, buildMission, buildFlash, PLANETS } from '../js/skills.js';
+import { SKILLS, NUM_MAX, buildMission, buildFlash, PLANETS, tablesQuestion, factKey } from '../js/skills.js';
 import { toWords } from '../js/util.js';
 
 let failures = 0;
@@ -67,6 +67,19 @@ const mult = SKILLS.find((s) => s.id === 'c_mult');
 for (let i = 0; i < 200; i++) {
   const q = mult.gen(5, { tables: [7] });
   if (!/\b7\b/.test(q.prompt)) fail('tables imposées non respectées', q);
+}
+
+// Défi tables : les faits fragiles (boîte 0) reviennent plus souvent que les faits sûrs (boîte 4).
+{
+  const facts = {};
+  for (let k = 1; k <= 10; k++) facts[factKey(2, k)] = { box: 4 };
+  let fragile = 0;
+  for (let i = 0; i < 2000; i++) {
+    const q = tablesQuestion(2, { tables: [2, 3] }, facts);
+    if (q.answer !== (q.prompt.startsWith('?') ? q.fact[0] : q.fact[0] * q.fact[1])) fail('défi tables : réponse fausse', q);
+    if (!q.fact.includes(2) || q.fact.includes(3)) fragile += q.fact.includes(3) ? 1 : 0;
+  }
+  if (fragile < 1500) fail(`défi tables : la table de 3 (non sue) devrait dominer (${fragile}/2000)`, {});
 }
 
 if (failures) { console.error(`\n${failures} échec(s)`); process.exit(1); }

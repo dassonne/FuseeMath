@@ -1,27 +1,47 @@
 // Générateurs d'exercices, alignés sur les repères annuels de CE1 (cycle 2).
 //
 // Le niveau (1 à 5) suit les 5 périodes de l'année (programme 2025) :
-//   1 = sept.–oct.  nombres jusqu'à 100
-//   2 = nov.–déc.   nombres jusqu'à 1 000 (au plus tard en période 2), premières fractions
-//   3 = janv.–fév.  approfondissement, calculs jusqu'à 500
-//   4 = mars–avril  calculs jusqu'à 1 000
+//   1 = sept.–oct.  nombres jusqu'à 200, moitié / demi / quart, tables de 1, 2, 5, 10
+//   2 = nov.–déc.   nombres jusqu'à 1 000, fractions unitaires et écriture chiffrée, tables 1 à 6 et 10
+//   3 = janv.–fév.  calculs jusqu'à 500, fractions non unitaires, table de 7, soustraction posée
+//   4 = mars–avril  calculs jusqu'à 1 000, comparer et additionner des fractions, table de 8
 //   5 = mai–juin    consolidation, toutes les tables de 0 à 10
+// (d'après le programme 2025 et le livret d'accompagnement CE1 d'éduscol)
 //
 // Chaque générateur renvoie une question :
 //   { prompt, say?, visual?, type, answer, choices?, items?, line?, suffix?, hint, explain }
 // type : 'numpad' | 'choice' | 'order' | 'line'
-import { rand, pick, chance, shuffle, sample, numChoices, fmt, toWords, NAMES } from './util.js';
+import { rand, pick, chance, shuffle, sample, numChoices, fmt, toWords, NAMES, fractionWords, fracHtml } from './util.js';
 import * as V from './visuals.js';
 
 // Étendue des nombres (numération) et des calculs, par niveau.
-export const NUM_MAX = [0, 100, 1000, 1000, 1000, 1000];
+export const NUM_MAX = [0, 200, 1000, 1000, 1000, 1000];
 export const CALC_MAX = [0, 100, 200, 500, 1000, 1000];
 const maxN = (L) => NUM_MAX[L];
 const calcN = (L) => CALC_MAX[L];
 
 // Tables de multiplication travaillées selon le niveau (toutes, de 0 à 10, en fin de CE1).
-export const TABLES_BY_LEVEL = [[], [2, 10], [2, 5, 10], [2, 3, 4, 5, 10], [2, 3, 4, 5, 6, 10], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]];
+export const TABLES_BY_LEVEL = [[], [1, 2, 5, 10], [1, 2, 3, 4, 5, 6, 10], [1, 2, 3, 4, 5, 6, 7, 10], [1, 2, 3, 4, 5, 6, 7, 8, 10], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]];
 const tablesFor = (L, opts) => (opts && opts.tables && opts.tables.length ? opts.tables : TABLES_BY_LEVEL[L]);
+
+// Indices pour retrouver un résultat de table à partir de ce qu'on connaît déjà
+// (commutativité, doubles, 10 fois moins 1 fois, décomposition), comme dans le livret CE1.
+export function multHint(a, b) {
+  if (a === 0 || b === 0) return 'Zéro fois un nombre, ou un nombre fois zéro, ça fait toujours 0.';
+  if (a === 1 || b === 1) return 'Une fois un nombre, c\'est ce nombre.';
+  if (a === 10 || b === 10) return `${a === 10 ? b : a} fois 10, c'est ${a === 10 ? b : a} dizaines.`;
+  if (a > b && b <= 6) return `${a} × ${b}, c'est pareil que ${b} × ${a} : utilise la table de ${b}.`;
+  const has = (f) => a === f || b === f, other = (f) => (a === f ? b : a);
+  if (has(2)) return `2 fois ${other(2)}, c'est le double de ${other(2)}.`;
+  if (has(4)) return `4 fois ${other(4)}, c'est le double de 2 fois ${other(4)} (${2 * other(4)}).`;
+  if (has(8)) return `8 fois ${other(8)}, c'est le double de 4 fois ${other(8)} (${4 * other(8)}).`;
+  if (has(9)) return `9 fois ${other(9)}, c'est 10 fois ${other(9)} (${10 * other(9)}) moins ${other(9)}.`;
+  if (has(5)) return `5 fois ${other(5)}, c'est la moitié de 10 fois ${other(5)} (${10 * other(5)}).`;
+  if (has(3)) return `3 fois ${other(3)}, c'est le double de ${other(3)} (${2 * other(3)}) plus ${other(3)}.`;
+  // Il reste 6 × 6, 6 × 7, 7 × 7… : 5 fois, plus le reste.
+  const [x, y] = a >= b ? [a, b] : [b, a];
+  return `${x} fois ${y}, c'est 5 fois ${y} (${5 * y}) plus ${x - 5} fois ${y} (${(x - 5) * y}).`;
+}
 
 export const PLANETS = [
   { id: 'nombres', name: 'Numéris', theme: 'Nombres', emoji: '🔢', colors: ['#ffd27a', '#e07b1f'], ring: false },
@@ -205,6 +225,154 @@ const nombres = [
       };
     },
   },
+  {
+    id: 'n_frac_name', label: 'Fractions : nommer (un demi, un tiers…)', minLevel: 1,
+    gen(L) {
+      const dens = L === 1 ? [2, 4] : L === 2 ? [2, 3, 4, 5, 6, 8, 10] : FRAC_DENS;
+      const d = pick(dens), kind = fracKind(d);
+      if (L === 1 && chance(0.4)) {
+        return {
+          prompt: `Quelle partie de la figure est coloriée ?`, visual: V.fraction(d, kind), type: 'choice',
+          choices: d === 2 ? shuffle(['la moitié', 'un quart', 'le tout']) : shuffle(['un quart', 'la moitié', 'le tout']),
+          answer: d === 2 ? 'la moitié' : 'un quart',
+          hint: 'Compte en combien de parts égales la figure est partagée.',
+          explain: d === 2 ? 'La figure est partagée en 2 parts égales : une part, c\'est <b>la moitié</b> (un demi).' : 'La figure est partagée en 4 parts égales : une part, c\'est <b>un quart</b>.',
+        };
+      }
+      const others = sample(dens.filter((x) => x !== d), Math.min(3, dens.length - 1));
+      return {
+        prompt: 'Quelle fraction de la figure est coloriée ?', visual: V.fraction(d, kind), type: 'choice',
+        choices: shuffle([d, ...others]).map((x) => fractionWords(1, x)), answer: fractionWords(1, d),
+        hint: 'Compte en combien de parts égales le tout est partagé. Dans « cinquième » on entend cinq, dans « tiers » le t de trois.',
+        explain: `Le tout est partagé en ${d} parts égales : une part, c'est <b>${fractionWords(1, d)}</b>.`,
+      };
+    },
+  },
+  {
+    id: 'n_frac_equal', label: 'Fractions : parts égales ou pas ?', minLevel: 1,
+    gen(L) {
+      const d = pick(L === 1 ? [2, 4] : [2, 3, 4]), equal = chance(0.5), kind = pick(['rect', 'disc']);
+      const name = fractionWords(1, d);
+      return {
+        prompt: `La partie coloriée est-elle <b>${name}</b> de la figure ?`, visual: V.fraction(d, kind, 1, !equal), type: 'choice',
+        choices: ['Oui', 'Non'], answer: equal ? 'Oui' : 'Non',
+        hint: `Pour parler ${name.replace('un ', 'd\'un ')}, il faut que le tout soit partagé en ${d} parts <b>égales</b>. Regarde bien la taille des parts.`,
+        explain: equal ? `Oui : le tout est partagé en ${d} parts égales, une part est <b>${name}</b>.`
+          : `<b>Non</b> : les parts ne sont pas égales, donc ce n'est pas ${name}.`,
+      };
+    },
+  },
+  {
+    id: 'n_frac_write', label: 'Fractions : écriture en chiffres', minLevel: 2,
+    gen(L) {
+      const d = pick(L >= 3 ? FRAC_DENS : [2, 3, 4, 5, 6, 8, 10]), n = L >= 3 && chance(0.5) ? rand(1, d) : 1;
+      const good = `${n}/${d}`, inv = `${d}/${n}`;
+      const opts = new Set([good]);
+      if (inv !== good) opts.add(inv); // erreur classique : inversion
+      while (opts.size < 4) opts.add(`${pick([1, n])}/${pick(FRAC_DENS)}`);
+      if (chance(0.5)) return {
+        prompt: `Comment s'écrit en chiffres <b>${fractionWords(n, d)}</b> ?`, type: 'choice', choices: shuffle([...opts]), answer: good,
+        hint: `Dis d'abord la fraction avec des mots : « ${fractionWords(n, d)} ». Le nombre de parts du partage s'écrit en bas.`,
+        explain: `${fractionWords(n, d)} s'écrit ${fracHtml(n, d)}`,
+      };
+      const words = new Set([fractionWords(n, d)]);
+      while (words.size < 4) words.add(fractionWords(pick([1, n]), pick(FRAC_DENS)));
+      return {
+        prompt: 'Comment se lit cette fraction ?', visual: `<div class="big-expr">${fracHtml(n, d)}</div>`,
+        say: 'Comment se lit cette fraction ?', type: 'choice', choices: shuffle([...words]), answer: fractionWords(n, d),
+        hint: `Le nombre du bas dit en combien de parts égales on partage (${d} : ${fractionWords(1, d).replace('un ', '')}), celui du haut combien on en prend.`,
+        explain: `${fracHtml(n, d)} se lit <b>${fractionWords(n, d)}</b>`,
+      };
+    },
+  },
+  {
+    id: 'n_frac_many', label: 'Fractions : plusieurs parts (deux tiers, trois quarts…)', minLevel: 3,
+    gen() {
+      const d = pick([3, 4, 5, 6, 8, 10]), n = rand(2, d);
+      const good = `${n}/${d}`, opts = new Set([good, `${d}/${n}`, `${n - 1}/${d}`, `${n}/${d + (d < 10 ? 1 : -1)}`].filter((x) => !x.startsWith('0/')));
+      while (opts.size < 4) opts.add(`${rand(1, d)}/${d}`);
+      return {
+        prompt: 'Quelle fraction de la figure est coloriée ?', visual: V.fraction(d, fracKind(d), n), type: 'choice',
+        choices: shuffle([good, ...sample([...opts].filter((x) => x !== good), 3)]), answer: good,
+        hint: `Compte les parts égales (en bas), puis les parts coloriées (en haut).`,
+        explain: `${n} parts coloriées sur un tout partagé en ${d} parts égales : ${fracHtml(n, d)} (${fractionWords(n, d)})${n === d ? ', c\'est le tout !' : ''}`,
+      };
+    },
+  },
+  {
+    id: 'n_frac_compare', label: 'Fractions : comparer', minLevel: 4,
+    gen() {
+      let a, b, why;
+      if (chance(0.5)) { // fractions unitaires : plus il y a de parts, plus elles sont petites
+        [a, b] = sample(FRAC_DENS, 2).map((d) => [1, d]);
+        why = 'Pour un même tout, plus il y a de parts, plus chaque part est petite.';
+      } else { // même nombre de parts
+        const d = pick(FRAC_DENS.filter((x) => x > 2)), [n1, n2] = sample(Array.from({ length: d }, (_, i) => i + 1), 2);
+        [a, b] = [[n1, d], [n2, d]];
+        why = 'Les parts ont la même taille : il suffit de compter combien on en prend.';
+      }
+      const va = a[0] / a[1], vb = b[0] / b[1], ans = va < vb ? '<' : va > vb ? '>' : '=';
+      return {
+        prompt: 'Choisis le bon signe.', say: `Compare ${fractionWords(...a)} et ${fractionWords(...b)}.`,
+        visual: `<div class="big-expr">${fracHtml(...a)} <span class="slot">?</span> ${fracHtml(...b)}</div><div class="frac-pair">${V.fraction(a[1], 'rect', a[0])}${V.fraction(b[1], 'rect', b[0])}</div>`,
+        type: 'choice', choices: ['<', '=', '>'], answer: ans, hint: why,
+        explain: `${fracHtml(...a)} <b>${ans}</b> ${fracHtml(...b)} : ${why.toLowerCase()}`,
+      };
+    },
+  },
+  {
+    id: 'n_frac_add', label: 'Fractions : additionner, soustraire (même partage)', minLevel: 4,
+    gen() {
+      const d = pick([3, 4, 5, 6, 8, 10]), plus = chance(0.6);
+      let n1 = rand(1, d - 1), n2 = rand(1, d - n1);
+      if (!plus) { const t = n1 + n2; n1 = t; }
+      const r = plus ? n1 + n2 : n1 - n2;
+      const good = `${r}/${d}`, opts = new Set([good, `${r}/${plus ? 2 * d : d}`, `${plus ? r : n1 + n2}/${d}`]);
+      if (r > 0) opts.add(`${r - 1}/${d}`);
+      while (opts.size < 4) opts.add(`${rand(1, d)}/${d}`);
+      return {
+        prompt: `Calcule :`, say: `Combien font ${fractionWords(n1, d)} ${plus ? 'plus' : 'moins'} ${fractionWords(n2, d)} ?`,
+        visual: `<div class="big-expr">${fracHtml(n1, d)} ${plus ? '+' : '−'} ${fracHtml(n2, d)} = <span class="slot">?</span></div>`,
+        type: 'choice', choices: shuffle([...opts]), answer: good,
+        hint: `Ce sont des ${fractionWords(2, d).split(' ')[1]} : on ${plus ? 'ajoute' : 'enlève'} des parts de même taille, le partage ne change pas.`,
+        explain: `${fractionWords(n1, d)} ${plus ? '+' : '−'} ${fractionWords(n2, d)} = <b>${fractionWords(r, d)}</b> ${fracHtml(r, d)}`,
+      };
+    },
+  },
+  {
+    id: 'n_frac_problem', label: 'Fractions : problèmes', minLevel: 3,
+    gen(L) {
+      if (L >= 4 && chance(0.5)) {
+        const d = pick([2, 3, 4, 5, 10]), each = rand(2, 10), tot = d * each, [thing, em] = pick(ITEMS);
+        return {
+          prompt: `Combien font <b>${fractionWords(1, d)}</b> de ${tot} ${thing} ?`, visual: `<div class="emoji-big">${em}</div>`,
+          type: 'numpad', answer: each,
+          hint: `${fractionWords(1, d)} : on partage les ${tot} ${thing} en ${d} parts égales et on en prend une.`,
+          explain: `${tot} partagé en ${d} parts égales : ${d} × ${each} = ${tot}, donc <b>${each}</b>`,
+        };
+      }
+      const [p1, p2] = sample(NAMES, 2);
+      const k = pick(['pizza', 'gourde', 'cake']);
+      if (k === 'pizza') return {
+        prompt: `${p1} mange la moitié d'une pizza. ${p2} mange un quart de la même pizza. Quelle fraction de la pizza reste-t-il ?`,
+        visual: V.fraction(4, 'disc', 3), type: 'choice', choices: shuffle(['un quart', 'la moitié', 'trois quarts', 'rien']), answer: 'un quart',
+        hint: 'Partage la pizza en 4 parts égales : la moitié, c\'est 2 quarts.',
+        explain: 'La moitié (2 quarts) + un quart = trois quarts mangés. Il reste <b>un quart</b> de la pizza.',
+      };
+      if (k === 'cake') return {
+        prompt: `${p1} partage un cake en 5 parts égales. ${p2} recoupe chaque part en 2 parts égales et en mange une. Quelle fraction du cake a été mangée ?`,
+        visual: V.fraction(10, 'rect', 1), type: 'choice', choices: shuffle(['1/10', '1/5', '1/2', '2/5']), answer: '1/10',
+        hint: '5 parts recoupées chacune en 2 : combien de parts égales en tout ?',
+        explain: `5 × 2 = 10 parts égales : une part, c'est ${fracHtml(1, 10)} (<b>un dixième</b>).`,
+      };
+      return {
+        prompt: `${p1} et ${p2} ont bu chacun la moitié de leur gourde. Pourtant, il reste plus d'eau à ${p2}. Est-ce possible ?`,
+        type: 'choice', choices: ['Oui, si sa gourde est plus grande', 'Non, c\'est impossible'], answer: 'Oui, si sa gourde est plus grande',
+        hint: 'La moitié de quoi ? Une fraction dépend du tout.',
+        explain: '<b>Oui</b> : la moitié d\'une grande gourde, c\'est plus que la moitié d\'une petite. Une fraction dépend du tout.',
+      };
+    },
+  },
 ];
 
 // ---------------------------------------------------------------- Calcul
@@ -279,34 +447,77 @@ const calcul = [
     },
   },
   {
-    id: 'c_mult', label: 'Tables de multiplication', minLevel: 2,
-    gen(L, opts) {
-      const t = pick(tablesFor(L, opts)), k = rand(0, 10) || rand(1, 10);
-      const [a, b] = chance(0.5) ? [t, k] : [k, t];
-      const small = Math.min(a, b), big = Math.max(a, b);
-      if (small === 0) return {
-        prompt: `${a} × ${b} = ?`, type: 'numpad', answer: 0,
-        hint: '0 fois un nombre, ou un nombre fois 0 : il n\'y a rien du tout !', explain: `${a} × ${b} = <b>0</b>`,
+    id: 'c_add9', label: 'Ajouter 9, 19, 29 ; soustraire 9', minLevel: 1,
+    gen(L) {
+      const opts = L === 1 ? [9] : L === 2 ? [9, 19, -9] : [9, 19, 29, -9];
+      const k = pick(opts), m = calcN(L);
+      // Parfois un nombre qui finit par 0 ou 1 : la procédure n'est alors pas utile.
+      const easy = chance(0.2);
+      let a = rand(k < 0 ? 10 : 1, m - Math.abs(k) - 1);
+      if (easy) a = a - (a % 10) + pick([0, 1]);
+      if (k < 0 && a < 10) a += 10;
+      const r = a + k, abs = Math.abs(k), round = abs + 1;
+      if (k < 0) return {
+        prompt: `${fmt(a)} − 9 = ?`, type: 'numpad', answer: r,
+        hint: 'Pour enlever 9, enlève 10 puis ajoute 1.',
+        explain: `${fmt(a)} − 10 + 1 = ${fmt(a - 10)} + 1 = <b>${fmt(r)}</b>`,
       };
+      const direct = a % 10 <= 1;
       return {
-        prompt: `${a} × ${b} = ?`, type: 'numpad', answer: a * b,
-        visual: a * b <= 30 ? V.groups(small, big, '⭐') : undefined,
-        hint: `${a} × ${b}, c'est ${small} fois ${big} : ${Array(Math.min(small, 5)).fill(big).join(' + ')}${small > 5 ? ' + …' : ''}`,
-        explain: `${a} × ${b} = <b>${a * b}</b>`,
+        prompt: `${fmt(a)} + ${abs} = ?`, type: 'numpad', answer: r,
+        hint: direct ? `${fmt(a)} finit par ${a % 10} : tu peux ajouter ${abs} directement.`
+          : `Pour ajouter ${abs}, ajoute ${round} puis enlève 1.`,
+        explain: direct ? `${fmt(a)} + ${abs} = <b>${fmt(r)}</b>`
+          : `${fmt(a)} + ${abs} = ${fmt(a)} + ${round} − 1 = ${fmt(a + round)} − 1 = <b>${fmt(r)}</b>`,
       };
     },
   },
   {
-    id: 'c_mult_inv', label: 'Tables dans les deux sens (? × 4 = 20)', minLevel: 3,
+    id: 'c_mult', label: 'Tables de multiplication', minLevel: 1,
+    gen(L, opts) {
+      const t = pick(tablesFor(L, opts)), k = rand(0, 10) || rand(1, 10);
+      const [a, b] = chance(0.5) ? [t, k] : [k, t];
+      return {
+        prompt: `${a} × ${b} = ?`, type: 'numpad', answer: a * b, fact: [a, b],
+        visual: a * b && a * b <= 30 ? V.groups(Math.min(a, b), Math.max(a, b), '⭐') : undefined,
+        hint: multHint(a, b), explain: `${a} fois ${b}, <b>${a * b}</b>`,
+      };
+    },
+  },
+  {
+    id: 'c_mult_inv', label: 'Tables dans les deux sens (? × 7 = 42)', minLevel: 2,
     gen(L, opts) {
       const t = pick(tablesFor(L, opts).filter((x) => x > 1).concat([2])), k = rand(2, 10), c = t * k;
-      if (chance(0.5)) return {
-        prompt: `? × ${t} = ${c}`, say: `Combien de fois ${t} égale ${c} ?`, type: 'numpad', answer: k,
-        hint: `Récite la table de ${t} jusqu'à trouver ${c}.`, explain: `<b>${k}</b> × ${t} = ${c}`,
-      };
+      const q = pick([
+        [`? × ${t} = ${c}`, `Combien de fois ${t} égale ${c} ?`, `<b>${k}</b> × ${t} = ${c}`],
+        [`${t} × ? = ${c}`, `${t} fois combien égale ${c} ?`, `${t} × <b>${k}</b> = ${c}`],
+        [`${c} = ${t} × ?`, `${c} égale ${t} fois combien ?`, `${c} = ${t} × <b>${k}</b>`],
+      ]);
       return {
-        prompt: `${c} = ${t} × ?`, say: `${c} égale ${t} fois combien ?`, type: 'numpad', answer: k,
-        hint: `Dans la table de ${t}, quel nombre donne ${c} ?`, explain: `${c} = ${t} × <b>${k}</b>`,
+        prompt: q[0], say: q[1], type: 'numpad', answer: k, fact: [k, t],
+        hint: `Récite la table de ${t} : ${t}, ${2 * t}, ${3 * t}… jusqu'à ${c}.`, explain: `${q[2]} (${k} fois ${t}, ${c})`,
+      };
+    },
+  },
+  {
+    id: 'c_mult10', label: 'Multiplier par 10', minLevel: 1,
+    gen(L) {
+      const n = rand(2, L === 1 ? 19 : 99);
+      const [a, b] = chance(0.5) ? [n, 10] : [10, n];
+      return {
+        prompt: `${a} × ${b} = ?`, type: 'numpad', answer: n * 10,
+        hint: `${n} × 10, c'est ${n} dizaines.`, explain: `${n} dizaines = <b>${fmt(n * 10)}</b>`,
+      };
+    },
+  },
+  {
+    id: 'c_mult_big', label: 'Multiplier 11 à 19 par un petit nombre', minLevel: 3,
+    gen(L) {
+      const big = rand(11, 19), small = rand(2, L >= 4 ? 9 : 5), u = big - 10;
+      return {
+        prompt: `${big} × ${small} = ?`, type: 'numpad', answer: big * small,
+        hint: `Décompose ${big} en 10 + ${u} : calcule 10 × ${small}, puis ${u} × ${small}, et ajoute.`,
+        explain: `${big} × ${small} = 10 × ${small} + ${u} × ${small} = ${10 * small} + ${u * small} = <b>${big * small}</b>`,
       };
     },
   },
@@ -314,7 +525,7 @@ const calcul = [
     id: 'c_posed', label: 'Opérations posées', minLevel: 2,
     gen(L) {
       const m = calcN(L);
-      if (L >= 4 && chance(0.4)) {
+      if (L >= 3 && chance(0.4)) {
         const a = rand(200, m - 1), b = rand(20, a - 50);
         return {
           prompt: 'Calcule cette soustraction posée :', say: `Calcule ${a} moins ${b}`, visual: V.column([a, b], '−'), type: 'numpad', answer: a - b,
@@ -342,7 +553,7 @@ const probRange = (L) => [0, 50, 100, 300, 600, 900][L];
 
 const problemes = [
   {
-    id: 'p_change', label: 'Problèmes : on gagne, on perd', minLevel: 1,
+    id: 'p_change', label: 'Problèmes : ajout ou retrait (état final)', minLevel: 1,
     gen(L) {
       const who = pick(NAMES), [thing, em] = pick(ITEMS), R = probRange(L);
       const a = rand(5, Math.floor(R * 0.7)), b = rand(2, Math.max(3, Math.floor(R * 0.3)));
@@ -358,8 +569,34 @@ const problemes = [
       return {
         prompt: `${who} a ${big} ${thing}. ${who} en donne ${b} à un ami. Combien ${de(thing)} reste-t-il ?`,
         visual: `<div class="emoji-big">${em}</div>`, type: 'numpad', answer: a,
-        hint: `${who} donne des ${thing} : il en reste moins. Il faut enlever.`,
-        explain: `${big} − ${b} = <b>${a}</b> ${thing}${V.barParts(a, b, 'a')}`,
+        hint: `Le tout, c'est les ${big} ${thing} du début. Une partie est donnée, on cherche l'autre partie : il faut enlever.`,
+        explain: `${big} − ${b} = <b>${a}</b> ${thing}${V.barParts(b, a, 'b')}`,
+      };
+    },
+  },
+  {
+    id: 'p_change_unknown', label: 'Problèmes : retrouver l\'ajout ou l\'état de départ', minLevel: 2,
+    gen(L) {
+      const [p1, p2] = sample(NAMES, 2), [thing] = pick(ITEMS), R = probRange(L);
+      const start = rand(10, Math.floor(R * 0.6)), add = rand(5, Math.max(6, Math.floor(R * 0.35))), end = start + add;
+      const kind = L >= 3 ? pick(['added', 'initial', 'removed']) : pick(['added', 'removed']);
+      if (kind === 'added') return {
+        prompt: `Ce matin, ${p1} avait ${start} ${thing}. ${p2} lui en a donné. Maintenant, ${p1} a ${end} ${thing}. Combien ${de(thing)} ont été donnés ?`,
+        type: 'numpad', answer: add,
+        hint: `Le tout, c'est ce que ${p1} a maintenant (${end}). Une partie, c'est ce qu'il y avait ce matin. On cherche l'autre partie.`,
+        explain: `${end} − ${start} = <b>${add}</b>${V.barParts(start, add, 'b')}`,
+      };
+      if (kind === 'initial') return {
+        prompt: `${p1} avait des ${thing}. ${p2} lui en a donné ${add}. Maintenant, ${p1} a ${end} ${thing}. Combien ${de(thing)} y avait-il au début ?`,
+        type: 'numpad', answer: start,
+        hint: `Le tout, c'est les ${end} ${thing} de maintenant. Il est fait de ce qu'il y avait au début et des ${add} reçus.`,
+        explain: `${end} − ${add} = <b>${start}</b>${V.barParts(start, add, 'a')}`,
+      };
+      return {
+        prompt: `${p1} avait ${end} ${thing}. Une partie a été perdue. Il en reste ${start}. Combien ${de(thing)} ont été perdus ?`,
+        type: 'numpad', answer: add,
+        hint: `Le tout, c'est les ${end} ${thing} du début. Une partie est restée (${start}), l'autre a été perdue.`,
+        explain: `${end} − ${start} = <b>${add}</b>${V.barParts(start, add, 'b')}`,
       };
     },
   },
@@ -367,22 +604,57 @@ const problemes = [
     id: 'p_parts', label: 'Problèmes : le tout et les parties', minLevel: 1,
     gen(L) {
       const R = probRange(L), a = rand(3, Math.floor(R / 2)), b = rand(3, Math.floor(R / 2));
-      const [x, y, all, where] = pick([
-        ['filles', 'garçons', 'enfants', 'dans la cour'],
-        ['voitures rouges', 'voitures bleues', 'voitures', 'sur le parking'],
-        ['poissons jaunes', 'poissons rouges', 'poissons', 'dans l\'aquarium'],
+      // [partie 1, partie 2, question du tout, question de la 2e partie, phrase du tout]
+      const [p1, p2, askAll, askPart, total] = pick([
+        [`${a} pièces dans le coffre rouge`, `${b} pièces dans le coffre bleu`, 'Combien y a-t-il de pièces dans les deux coffres ?', 'Combien y a-t-il de pièces dans le coffre bleu ?', 'pièces rangées dans les deux coffres'],
+        [`${a} pommes`, `${b} poires`, 'Combien y a-t-il de fruits dans la corbeille ?', 'Combien y a-t-il de poires ?', 'fruits dans la corbeille : des pommes et des poires'],
+        [`${a} filles`, `${b} garçons`, 'Combien y a-t-il d\'enfants dans la cour ?', 'Combien y a-t-il de garçons ?', 'enfants dans la cour : des filles et des garçons'],
+        [`${a} perles jaunes`, `${b} perles vertes`, 'Combien y a-t-il de perles en tout ?', 'Combien y a-t-il de perles vertes ?', 'perles dans la boîte : des jaunes et des vertes'],
       ]);
-      if (L === 1 || chance(0.4)) {
+      if (L >= 4 && chance(0.25)) {
+        const [x, y, z] = [rand(20, R / 3), rand(20, R / 3), rand(20, R / 3)].map(Math.floor);
         return {
-          prompt: `Il y a ${a} ${x} et ${b} ${y} ${where}. Combien y en a-t-il en tout ?`, type: 'numpad', answer: a + b,
-          hint: 'On réunit les deux groupes : il faut ajouter.', explain: `${a} + ${b} = <b>${a + b}</b>${V.barParts(a, b, 'total')}`,
+          prompt: `Au zoo, il y a ${x} oiseaux, ${y} singes et ${z} lions. Combien d'animaux y a-t-il au zoo ?`, type: 'numpad', answer: x + y + z,
+          hint: 'Il y a trois parties et on cherche le tout : on additionne les trois parties.',
+          explain: `${x} + ${y} + ${z} = <b>${x + y + z}</b>`,
         };
       }
+      if (L === 1 || chance(0.4)) return {
+        prompt: `Il y a ${p1} et ${p2}. ${askAll}`, type: 'numpad', answer: a + b,
+        hint: 'On connaît les deux parties, on cherche le tout : il faut ajouter.', explain: `${a} + ${b} = <b>${a + b}</b>${V.barParts(a, b, 'total')}`,
+      };
       return {
-        prompt: `Il y a ${a + b} ${all} ${where} en tout. ${a} sont des ${x}, les autres sont des ${y}. Combien y a-t-il ${de(y)} ?`,
-        type: 'numpad', answer: b,
-        hint: `Tu connais le total et une partie. Cherche ce qu'il faut ajouter à ${a} pour avoir ${a + b}.`,
+        prompt: `Il y a ${a + b} ${total}. Il y a ${p1}. ${askPart}`, type: 'numpad', answer: b,
+        hint: `Tu connais le tout (${a + b}) et une partie (${a}). On cherche l'autre partie : on enlève.`,
         explain: `${a + b} − ${a} = <b>${b}</b>${V.barParts(a, b, 'b')}`,
+      };
+    },
+  },
+  {
+    id: 'p_model', label: 'Problèmes : choisir le bon calcul', minLevel: 2,
+    gen(L) {
+      const [p1, p2] = sample(NAMES, 2), [thing] = pick(ITEMS), R = probRange(L);
+      const a = rand(10, Math.floor(R * 0.6)), b = rand(5, Math.max(6, Math.floor(R * 0.35))), t = a + b;
+      const add = `${a} + ${b}`, sub = (x) => `${t} − ${x}`;
+      // [énoncé, bon calcul, mauvais calculs, explication, schéma]
+      const stories = [
+        [`${p1} avait ${t} ${thing}. ${p1} en donne ${b}. Combien en reste-t-il ?`, sub(b), [`${t} + ${b}`, `${b} − ${t}`],
+          'Le tout est connu (ce qu\'il y avait au début), on cherche une partie.', V.barParts(b, a, 'b')],
+        [`${p1} a ${a} ${thing} et ${p2} en a ${b}. Combien en ont-ils à eux deux ?`, add, [`${Math.max(a, b)} − ${Math.min(a, b)}`, `${a} + ${a}`],
+          'On connaît les deux parties, on cherche le tout.', V.barParts(a, b, 'total')],
+        [`${p1} avait des ${thing}. ${p2} lui en donne ${b}. Maintenant, ${p1} en a ${t}. Combien y en avait-il au début ?`, sub(b), [`${t} + ${b}`, `${b} − ${t}`],
+          'Le tout, c\'est ce qu\'il y a maintenant. On cherche une partie : ce qu\'il y avait au début.', V.barParts(a, b, 'a')],
+        [`Il y a ${t} ${thing} dans un sac : ${a} sont à ${p1}, les autres sont à ${p2}. Combien sont à ${p2} ?`, sub(a), [`${t} + ${a}`, `${a} − ${t}`],
+          'Le tout est connu, une partie aussi : on cherche l\'autre partie.', V.barParts(a, b, 'b')],
+        [`${p1} a ${a} ${thing}. ${p1} en gagne ${b}. Combien y en a-t-il maintenant ?`, add, [`${Math.max(a, b)} − ${Math.min(a, b)}`, `${b} + ${b}`],
+          'Ce qu\'il y avait et ce qui est gagné sont les deux parties ; on cherche le tout.', V.barParts(a, b, 'total')],
+      ];
+      const [text, ans, wrong, why, bar] = pick(stories);
+      return {
+        prompt: `${text}<br><b>Quel calcul permet de répondre ?</b>`, say: `${text} Quel calcul permet de répondre ?`,
+        type: 'choice', choices: shuffle([ans, ...[...new Set(wrong)].filter((w) => w !== ans)]), answer: ans,
+        hint: 'Cherche-t-on le tout ou une partie ? Pour trouver le tout, on additionne les parties. Pour trouver une partie, on enlève l\'autre partie du tout.',
+        explain: `${why} Le bon calcul est <b>${ans}</b>.${bar}`,
       };
     },
   },
@@ -448,7 +720,8 @@ const problemes = [
 ];
 
 // ---------------------------------------------------------------- Grandeurs & géométrie
-const FRACTION_NAMES = { 2: 'un demi', 3: 'un tiers', 4: 'un quart', 5: 'un cinquième', 6: 'un sixième', 8: 'un huitième', 10: 'un dixième' };
+const FRAC_DENS = [2, 3, 4, 5, 6, 8, 10];
+const fracKind = (d) => (d === 6 || d === 3 ? pick(['hex', 'disc', 'rect']) : [2, 4, 8].includes(d) ? pick(['square', 'disc', 'rect', 'fan']) : pick(['disc', 'rect']));
 const DAYS = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
 const MONTHS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
 const fmtTime = (h, m) => `${h} h${m ? ' ' + String(m).padStart(2, '0') : ''}`;
@@ -580,29 +853,6 @@ const grandeurs = [
     },
   },
   {
-    id: 'g_fraction', label: 'Fractions : un demi, un tiers, un quart…', minLevel: 2,
-    gen(L) {
-      const dens = L === 2 ? [2, 4] : L === 3 ? [2, 3, 4] : [2, 3, 4, 5, 6, 8, 10];
-      const parts = pick(dens);
-      if (L >= 4 && chance(0.35)) {
-        const d = pick([2, 3, 4, 5, 10]), each = rand(2, 10), tot = d * each, [thing, em] = pick(ITEMS);
-        return {
-          prompt: `Combien font <b>${FRACTION_NAMES[d]}</b> de ${tot} ${thing} ?`, visual: `<div class="emoji-big">${em}</div>`,
-          type: 'numpad', answer: each,
-          hint: `${FRACTION_NAMES[d][0].toUpperCase() + FRACTION_NAMES[d].slice(1)}, c'est une part quand on partage en ${d} parts égales.`,
-          explain: `${tot} partagé en ${d} parts égales : ${d} × ${each} = ${tot}, donc <b>${each}</b>`,
-        };
-      }
-      const others = sample(dens.filter((x) => x !== parts), Math.min(3, dens.length - 1));
-      return {
-        prompt: 'Quelle part de la figure est coloriée ?', visual: V.fraction(parts, pick(['rect', 'disc'])), type: 'choice',
-        choices: shuffle([parts, ...others]).map((d) => FRACTION_NAMES[d]), answer: FRACTION_NAMES[parts],
-        hint: 'Compte en combien de parts égales la figure est partagée : 2 → un demi, 3 → un tiers, 4 → un quart…',
-        explain: `La figure est partagée en ${parts} parts égales : une part, c'est <b>${FRACTION_NAMES[parts]}</b>.`,
-      };
-    },
-  },
-  {
     id: 'g_calendar', label: 'Jours, mois et calendrier', minLevel: 1,
     gen(L) {
       const kind = pick(L >= 3 ? ['dayAfter', 'dayBefore', 'month', 'inDays'] : ['dayAfter', 'dayBefore', 'month']);
@@ -723,10 +973,38 @@ export function buildMission(planetLevels, count, review = [], planetId = null, 
 
 // Défi éclair (boss de Calculo) : calculs rapides, comme la fluence attendue
 // en fin de CE1 (12 résultats en 3 minutes).
-const FLASH_SKILLS = ['c_add', 'c_sub', 'c_complement', 'c_tens', 'c_mult'];
+const FLASH_SKILLS = ['c_add', 'c_sub', 'c_complement', 'c_tens', 'c_add9', 'c_mult', 'c_mult10'];
 export function buildFlash(level, count, opts = {}) {
   const ids = FLASH_SKILLS.filter((id) => SKILL_BY_ID[id].minLevel <= level);
   return Array.from({ length: count }, () => { const s = SKILL_BY_ID[pick(ids)]; return { skill: s.id, level, ...s.gen(level, opts) }; });
 }
 
 export { toWords };
+
+// Défi tables (8 résultats en 1 minute en fin de CE1), avec récupération espacée :
+// chaque fait a une « boîte » de 0 à 4 ; les faits des petites boîtes reviennent plus souvent.
+export const factKey = (a, b) => `${Math.min(a, b)}x${Math.max(a, b)}`;
+
+export function tablesQuestion(level, opts = {}, facts = {}, avoid = null) {
+  const tables = tablesFor(level, opts).filter((t) => t > 0);
+  const pool = [];
+  for (const t of tables) {
+    for (let k = 1; k <= 10; k++) {
+      const key = factKey(t, k);
+      if (key === avoid) continue;
+      const box = facts[key] ? facts[key].box : 0;
+      for (let w = 0; w < 5 - box; w++) pool.push([t, k]);
+    }
+  }
+  const [t, k] = pick(pool), c = t * k;
+  const form = pick(['ab', 'ab', 'ba', 'missing']);
+  if (form === 'missing') return {
+    skill: 'c_mult_inv', level, prompt: `? × ${t} = ${c}`, say: `Combien de fois ${t} égale ${c} ?`, type: 'numpad', answer: k, fact: [k, t],
+    hint: multHint(k, t), explain: `${k} fois ${t}, <b>${c}</b>`,
+  };
+  const [a, b] = form === 'ab' ? [t, k] : [k, t];
+  return {
+    skill: 'c_mult', level, prompt: `${a} × ${b} = ?`, type: 'numpad', answer: c, fact: [a, b],
+    hint: multHint(a, b), explain: `${a} fois ${b}, <b>${c}</b>`,
+  };
+}
