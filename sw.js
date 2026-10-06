@@ -1,6 +1,6 @@
 // Service worker : permet de jouer hors ligne une fois le site ouvert une première fois.
 // Incrémenter VERSION à chaque mise à jour des fichiers.
-const VERSION = 'fusee-maths-v5';
+const VERSION = 'fusee-maths-v6';
 const FILES = [
   './', 'index.html', 'manifest.webmanifest', 'css/style.css',
   'js/app.js', 'js/skills.js', 'js/store.js', 'js/util.js', 'js/visuals.js',

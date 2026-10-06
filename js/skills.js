@@ -1086,3 +1086,24 @@ export function tablesQuestion(level, opts = {}, facts = {}, avoid = null) {
     hint: multHint(a, b), explain: `${a} fois ${b}, <b>${c}</b>`,
   };
 }
+
+// Tuiles de réponse (mode jeu) : 3 réponses-pièges plausibles autour de la bonne.
+// Erreurs typiques : ±1, ±10 (retenue oubliée), chiffres inversés, ligne voisine de la table.
+export function answerTiles(q) {
+  const a = q.answer, cands = [];
+  if (q.fact) {
+    const [x, y] = q.fact;
+    if (q.prompt.includes('?') && q.answer !== x * y) cands.push(a + 1, a - 1, a + 2);
+    else cands.push((x + 1) * y, (x - 1) * y, x * (y + 1), x * (y - 1), x + y);
+  }
+  cands.push(a + 1, a - 1, a + 10, a - 10, a + 2);
+  if (a >= 10) { const r = Number(String(a).split('').reverse().join('')); cands.push(r); }
+  if (a >= 100) cands.push(a + 100, a - 100);
+  const pool = [...new Set(cands)].filter((v) => Number.isInteger(v) && v >= 0 && v !== a && v <= 1100);
+  const picked = [];
+  // Garde les deux premières erreurs « typiques » puis complète au hasard.
+  for (const v of shuffle(pool.slice(0, 4)).concat(shuffle(pool.slice(4)))) if (picked.length < 3 && !picked.includes(v)) picked.push(v);
+  let k = 3;
+  while (picked.length < 3) { const v = a + k++; if (!picked.includes(v)) picked.push(v); }
+  return shuffle([a, ...picked]);
+}

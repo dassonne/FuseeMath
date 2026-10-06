@@ -1,6 +1,6 @@
-import { PLANETS, SKILLS, buildMission, buildFlash, NUM_MAX, TABLES_BY_LEVEL, tablesQuestion, factKey } from './skills.js';
+import { PLANETS, SKILLS, buildMission, buildFlash, NUM_MAX, TABLES_BY_LEVEL, tablesQuestion, factKey, answerTiles } from './skills.js';
 import * as Store from './store.js';
-import { rocket, planet, numberLine, alien, fraction } from './visuals.js';
+import { rocket, planet, numberLine, fraction, hero, heroHead, monster, sceneBg, sceneColors } from './visuals.js';
 import { pick, shuffle, sample, escapeHtml, fmt, fractionWords, fracHtml } from './util.js';
 
 const app = document.getElementById('app');
@@ -144,7 +144,7 @@ function renderHome() {
           return `<button class="planet-card ${Store.bossReady(ps) ? 'has-boss' : ''}" data-planet="${p.id}" style="--c:${p.colors[1]}">
             ${planet(p.colors[0], p.colors[1], p.ring)}
             <b>${p.name}</b><span class="theme">${p.emoji} ${p.theme}</span>
-            <span class="lvl">Niveau ${ps.level}</span><span class="dots">${levelDots(ps)}</span>
+            <span class="lvl">Niveau ${ps.level}</span><span class="dots">${levelDots(ps)}</span><small class="step">Étape ${Math.min(Store.currentNode(ps) + 1, Store.NODES)}/${Store.NODES}</small>
           </button>`;
         }).join('')}
       </div>
@@ -159,8 +159,7 @@ function renderHome() {
     ${nav('home')}`, 'space');
   app.querySelectorAll('[data-planet]').forEach((b) => b.addEventListener('click', () => {
     const id = b.dataset.planet || null;
-    if (id && Store.bossReady(state.planets[id])) renderBossIntro(id);
-    else startMission(id, 'normal');
+    if (id) renderMap(id); else startMission(null, 'normal');
   }));
   app.querySelectorAll('[data-arcade]').forEach((b) => b.addEventListener('click', () => {
     if (b.dataset.arcade === 'memory') renderMemory(); else startArcade(b.dataset.arcade);
@@ -176,7 +175,7 @@ function startArcade(kind) {
   const foe = { id: null, planet: 'calcul', level: 3, boss: false, name: tables ? 'Multiplix' : 'Zappy', color: tables ? '#ff5c7a' : '#ffd23f' };
   const opts = { tables: state.tables };
   const questions = tables ? [tablesQuestion(tablesLevel(), opts, state.facts)] : buildFlash(tablesLevel(), Store.FLASH.size, opts);
-  mission = { planetId: null, kind, arcade: true, questions, idx: 0, attempts: 0, score: 0, hits: 0, results: [], foe, deadline: null, timer: null };
+  mission = { planetId: null, kind, arcade: true, questions, idx: 0, attempts: 0, score: 0, hits: 0, results: [], foe, theme: 'arcade', deadline: null, timer: null };
   const timed = tables || state.flashTimer;
   screen(`
     <main class="launch boss-intro">
@@ -275,54 +274,122 @@ const arcadeBanners = (out) => `
   ${out.newBadges.map((b) => `<div class="banner badge">${b.icon} Nouveau trophée : <b>${b.name}</b></div>`).join('')}
   ${out.newRockets.map((r) => `<div class="banner badge">${rocket(r.color, 28)} Nouvelle fusée débloquée : <b>${r.name}</b> !</div>`).join('')}`;
 
+// ------------------------------------------------------------------ Carte d'aventure
+// Chaque planète : 5 niveaux × (3 étapes + 1 boss) = 20 étapes sur un chemin sinueux.
+const DECOS = {
+  nombres: ['🪨', '🌵', '🏜️', '🦂', '🌵', '🪨'], calcul: ['💎', '🧊', '❄️', '🔷', '💎', '🧊'],
+  problemes: ['🍄', '🌿', '🌳', '🐸', '🌼', '🍄'], grandeurs: ['🔷', '🔶', '📐', '🔺', '🟣', '📏'],
+  temps: ['⏳', '🕰️', '🌙', '☀️', '⌛', '📅'],
+};
+const nodeX = (i) => 50 + 30 * Math.sin(i * 1.15);
+const nodeY = (i) => 120 + i * 96 + Math.floor(i / Store.NODES_PER_LEVEL) * 64;
+
+function renderMap(planetId, justUnlocked = false) {
+  const p = planetById(planetId), ps = state.planets[planetId];
+  const cur = Store.currentNode(ps);
+  const colors = sceneColors(planetId);
+  const height = nodeY(Store.NODES - 1) + 120;
+  const pts = Array.from({ length: Store.NODES }, (_, i) => [nodeX(i), nodeY(i)]);
+  // Chemin : courbes douces entre les étapes (coordonnées x en %, converties sur une largeur de 100).
+  let d = `M${pts[0][0]} ${pts[0][1]}`;
+  for (let i = 1; i < pts.length; i++) {
+    const [x0, y0] = pts[i - 1], [x1, y1] = pts[i], my = (y0 + y1) / 2;
+    d += ` C${x0} ${my} ${x1} ${my} ${x1} ${y1}`;
+  }
+  const totalStars = Object.values(ps.nodes).reduce((a, b) => a + b, 0);
+  const nodes = pts.map(([x, y], i) => {
+    const boss = Store.isBossNode(i), L = Store.nodeLevel(i);
+    const st = i < cur ? 'done' : i === cur ? 'current' : 'locked';
+    const stars = ps.nodes[i] || 0;
+    const banner = i % Store.NODES_PER_LEVEL === 0
+      ? `<div class="lvl-banner" style="top:${y - 74}px">Niveau ${L} <small>${PERIODS[L].split(' (')[0]}</small></div>` : '';
+    const deco = `<span class="deco" style="top:${y - 20}px;left:${x > 50 ? 8 + (i * 7) % 14 : 78 + (i * 5) % 12}%">${DECOS[planetId][i % 6]}</span>`;
+    return `${banner}${deco}<button class="node ${st} ${boss ? 'boss' : ''} ${justUnlocked && i === cur ? 'unlocked' : ''}" data-node="${i}" style="left:${x}%;top:${y}px" aria-label="étape ${i + 1}">
+      <span class="n-num">${boss ? monster(st === 'locked' ? '#b9b4d8' : Store.ALIEN_COLORS[planetId], L, true, 54) : i + 1}</span>
+      <span class="n-stars">${[1, 2, 3].map((k) => `<i class="${k <= stars ? 'on' : ''}">★</i>`).join('')}</span>
+      ${i === cur ? `<span class="n-hero">${hero(rocketColor(), 64)}</span>` : ''}
+    </button>`;
+  }).join('');
+  screen(`
+    <header class="map-top" style="--c:${p.colors[1]}">
+      <button class="round-btn" data-go="home" aria-label="retour">‹</button>
+      <div><b>${p.emoji} ${p.name}</b><small>${p.theme} · étape ${Math.min(cur + 1, Store.NODES)}/${Store.NODES}</small></div>
+      <div class="star-count">⭐ ${totalStars}/${Store.NODES * 3}</div>
+    </header>
+    <main class="adv-map" style="height:${height}px;--sky1:${colors.sky[0]};--sky2:${colors.sky[1]};--ground:${colors.ground};--ground2:${colors.ground2}">
+      <svg class="path" viewBox="0 0 100 ${height}" preserveAspectRatio="none" aria-hidden="true">
+        <path d="${d}" class="path-bg"/><path d="${d}" class="path-dash"/>
+      </svg>
+      ${nodes}
+      ${ps.master ? `<div class="lvl-banner master" style="top:${height - 60}px">👑 Planète maîtrisée !</div>` : ''}
+    </main>`, 'map-screen');
+  app.querySelectorAll('.node').forEach((b) => b.addEventListener('click', () => {
+    const i = Number(b.dataset.node);
+    if (i > cur) { animate(b, 'nope'); toast(`Termine d'abord l'étape ${cur + 1} !`); return; }
+    if (Store.isBossNode(i)) renderBossIntro(planetId, i);
+    else startMission(planetId, 'normal', i);
+  }));
+  const target = app.querySelector('.node.current') || app.querySelector('.node:last-of-type');
+  if (target) setTimeout(() => target.scrollIntoView({ block: 'center', behavior: justUnlocked ? 'smooth' : 'auto' }), 30);
+}
+
+function toast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast'; t.textContent = msg;
+  app.appendChild(t);
+  setTimeout(() => t.remove(), 1800);
+}
+
 // ------------------------------------------------------------------ Missions & combats
-function makeFoe(planetId, kind) {
-  const pid = planetId || pick(PLANETS).id, L = state.planets[pid].level;
+function makeFoe(planetId, kind, level = null) {
+  const pid = planetId || pick(PLANETS).id, L = level || state.planets[pid].level;
   const boss = kind !== 'normal';
   return {
     id: boss ? `${pid}-boss-${L}` : `${pid}-${L}`, planet: pid, level: L, boss,
     name: boss ? Store.BOSS_NAMES[pid] : Store.ALIEN_NAMES[pid][L - 1], color: Store.ALIEN_COLORS[pid],
   };
 }
-const foeSvg = (f, size) => alien(f.color, f.level, f.boss, size);
+const foeSvg = (f, size) => monster(f.color, f.level, f.boss, size);
 
-function renderBossIntro(planetId) {
-  const p = planetById(planetId), L = state.planets[planetId].level;
-  const foe = makeFoe(planetId, 'boss');
+function renderBossIntro(planetId, node = Store.currentNode(state.planets[planetId])) {
+  const p = planetById(planetId), L = Store.nodeLevel(node);
+  const foe = makeFoe(planetId, 'boss', L);
   const flash = planetId === 'calcul';
+  const replay = node < Store.currentNode(state.planets[planetId]);
   sfx.boss();
   screen(`
     <main class="launch boss-intro">
-      <div class="boss-big">${foeSvg(foe, 150)}</div>
+      <div class="boss-big">${foeSvg(foe, 160)}</div>
       <h2>${foe.name} t'attend !</h2>
       <p>C'est le boss du niveau ${L} sur ${p.name}.</p>
       <p class="rule">${flash
         ? (state.flashTimer ? `⚡ <b>Défi éclair</b> : ${Store.FLASH.size} calculs en 3 minutes. Réussis-en ${Store.FLASH.toWin} pour gagner !` : `⚡ <b>Défi éclair</b> : ${Store.FLASH.size} calculs. Réussis-en ${Store.FLASH.toWin} du premier coup pour gagner !`)
         : `⚔️ ${Store.BOSS.size} défis. Réussis-en ${Store.BOSS.toWin} du premier coup pour gagner !`}</p>
-      <p class="small">${L < 5 ? `Si tu gagnes : niveau ${L + 1} débloqué !` : 'Si tu gagnes : tu deviens Maître de la planète !'}</p>
+      <p class="small">${replay ? 'Revanche : améliore tes étoiles !' : L < 5 ? `Si tu gagnes : niveau ${L + 1} débloqué !` : 'Si tu gagnes : tu deviens Maître de la planète !'}</p>
       <div class="result-actions">
         <button class="btn primary big" id="fight">Combattre ⚔️</button>
-        <button class="btn" id="later">Plus tard : mission normale</button>
+        <button class="btn" id="later">Retour à la carte</button>
       </div>
     </main>`, 'space');
-  app.querySelector('#fight').addEventListener('click', () => startMission(planetId, flash ? 'flash' : 'boss'));
-  app.querySelector('#later').addEventListener('click', () => startMission(planetId, 'normal'));
+  app.querySelector('#fight').addEventListener('click', () => startMission(planetId, flash ? 'flash' : 'boss', node));
+  app.querySelector('#later').addEventListener('click', () => renderMap(planetId));
 }
 
-function startMission(planetId, kind) {
+function startMission(planetId, kind, node = null) {
   const levels = Object.fromEntries(PLANETS.map((p) => [p.id, state.planets[p.id].level]));
+  if (planetId && node !== null) levels[planetId] = Store.nodeLevel(node);
   const opts = { tables: state.tables };
   const questions = kind === 'flash' ? buildFlash(levels.calcul, Store.FLASH.size, opts)
     : buildMission(levels, kind === 'boss' ? Store.BOSS.size : Store.MISSION_SIZE, state.review, planetId, opts);
-  const foe = makeFoe(planetId, kind);
-  mission = { planetId, kind, questions, idx: 0, attempts: 0, score: 0, hits: 0, results: [], foe, deadline: null, timer: null };
+  const foe = makeFoe(planetId, kind, planetId ? levels[planetId] : null);
+  mission = { planetId, kind, node, questions, idx: 0, attempts: 0, score: 0, hits: 0, results: [], foe, theme: foe.planet, deadline: null, timer: null };
   const p = planetId && planetById(planetId);
   screen(`
     <main class="launch">
       <div class="launch-rocket">${rocket(rocketColor(), 100)}</div>
-      <h2>${p ? `Cap sur ${p.name} !` : 'Mission mélange !'}</h2>
-      <div class="encounter">${foeSvg(foe, 90)}<p>${kind === 'normal' ? `Un alien sauvage apparaît : <b>${foe.name}</b> !` : `Le boss <b>${foe.name}</b> est prêt !`}</p></div>
-      <p class="small">${kind === 'normal' ? 'Chaque bonne réponse le touche. Capture-le !' : 'Concentre-toi bien !'}</p>
+      <h2>${p ? `${p.name} · étape ${node + 1}` : 'Mission mélange !'}</h2>
+      <div class="encounter">${foeSvg(foe, 110)}<p>${kind === 'normal' ? `Un alien sauvage apparaît : <b>${foe.name}</b> !` : `Le boss <b>${foe.name}</b> est prêt !`}</p></div>
+      <p class="small">${kind === 'normal' ? `Réussis ${Store.PASS_SCORE} défis sur ${Store.MISSION_SIZE} du premier coup pour le capturer !` : 'Concentre-toi bien !'}</p>
     </main>`, 'space');
   setTimeout(() => {
     if (mission && kind === 'flash' && state.flashTimer) {
@@ -330,11 +397,11 @@ function startMission(planetId, kind) {
       mission.timer = setInterval(tick, 250);
     }
     if (mission) renderQuestion();
-  }, 1700);
+  }, 1600);
 }
 
 function tick() {
-  if (!mission || !mission.deadline) return;
+  if (!mission || !mission.deadline || mission.paused) return;
   const left = Math.max(0, Math.ceil((mission.deadline - Date.now()) / 1000));
   const el = app.querySelector('.timer');
   if (el) { el.textContent = `⏱ ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`; el.classList.toggle('urgent', left <= (mission.kind === 'tables' ? 10 : 30)); }
@@ -347,31 +414,49 @@ function stopMission() {
   clearTimeout(nextTimer);
 }
 
-function arena() {
-  const f = mission.foe, total = foeHp();
-  const hp = Math.max(0, total - mission.hits);
-  return `<div class="arena">
-    <div class="hero">${rocket(rocketColor(), 54)}</div>
-    <div class="laser"></div>
-    <div class="foe"><div class="bubble"></div>${foeSvg(f, f.boss ? 78 : 64)}</div>
-    <div class="foe-info"><b>${f.name}</b><div class="hp"><div class="hp-fill" style="width:${(hp / total) * 100}%"></div></div></div>
-  </div>`;
+// Pause : le chronomètre s'arrête, on peut reprendre ou quitter.
+function pauseMenu() {
+  if (!mission || mission.paused) return;
+  mission.paused = true;
+  if (mission.deadline) { mission.left = mission.deadline - Date.now(); clearInterval(mission.timer); }
+  const o = document.createElement('div');
+  o.className = 'pause-overlay';
+  o.innerHTML = `<div class="pause-box"><h2>Pause</h2>
+    <button class="btn primary big" id="resume">Reprendre ▶</button>
+    <button class="btn" id="quit">Quitter la mission</button>
+    <p class="small">Si tu quittes, cette mission ne compte pas.</p></div>`;
+  app.appendChild(o);
+  o.querySelector('#resume').addEventListener('click', () => {
+    o.remove();
+    mission.paused = false;
+    if (mission.left != null) { mission.deadline = Date.now() + mission.left; mission.left = null; mission.timer = setInterval(tick, 250); }
+    if (mission.pendingNext) { mission.pendingNext = false; next(); }
+  });
+  o.querySelector('#quit').addEventListener('click', () => {
+    const pid = mission.planetId, arcade = mission.arcade;
+    stopMission(); mission = null;
+    if (pid && !arcade) renderMap(pid); else renderHome();
+  });
 }
 
 // Points de vie de l'adversaire : une bonne réponse = un point (objectif 8 pour le Défi tables).
 const foeHp = () => (mission.kind === 'tables' ? Store.TABLES_CHALLENGE.goal : mission.questions.length);
 
 function progressBar() {
-  const n = mission.questions.length;
-  const left = mission.kind === 'tables' ? `<span>✓ ${mission.score}</span>` : `<span>${mission.idx + 1}/${n}</span>`;
-  return `<div class="progress">${left}${mission.deadline ? '<span class="timer"></span>' : ''}</div>`;
+  if (mission.kind === 'tables') return `<div class="b-progress"><span class="b-score">✓ ${mission.score}</span></div>`;
+  const n = mission.questions.length, pct = (mission.idx / n) * 100;
+  return `<div class="b-progress"><div class="track"><div class="fill" style="width:${pct}%"></div>
+    <div class="head" style="left:${pct}%">${heroHead(rocketColor(), 30)}</div></div></div>`;
 }
 
 // « 3/4 » s'affiche en écriture fractionnaire.
 const choiceLabel = (c) => (/^\d+\/\d+$/.test(c) ? fracHtml(...c.split('/')) : escapeHtml(c));
+const plainText = (html) => html.replace(/<[^>]+>/g, '');
 
 function answerArea(q) {
   switch (q.type) {
+    case 'tiles':
+      return `<div class="tiles">${q.choices.map((c) => `<button class="tile" data-c="${c}">${fmt(Number(c))}${q.suffix ? `<small>${q.suffix}</small>` : ''}</button>`).join('')}</div>`;
     case 'numpad':
       return `<div class="answer-box"><span class="answer-display" aria-live="polite"></span>${q.suffix ? `<span class="suffix">${q.suffix}</span>` : ''}</div>
         <div class="numpad">${[7, 8, 9, 4, 5, 6, 1, 2, 3].map((d) => `<button data-k="${d}">${d}</button>`).join('')}
@@ -391,29 +476,52 @@ function answerArea(q) {
 
 function renderQuestion() {
   const q = mission.questions[mission.idx];
+  // Mode jeu : les réponses numériques deviennent 4 tuiles (sauf si le parent préfère le pavé numérique).
+  if (q.type === 'numpad' && state.answerMode !== 'pad' && !q.tiles) q.tiles = answerTiles(q).map(String);
+  const view = q.tiles && state.answerMode !== 'pad' ? { ...q, type: 'tiles', choices: q.tiles, answer: String(q.answer) } : q;
   mission.attempts = 0;
   locked = false;
+  const f = mission.foe, total = foeHp(), hp = Math.max(0, total - mission.hits);
+  // Les calculs courts (« 60 + 9 = ? ») s'affichent en grand dans le décor, comme dans un jeu.
+  const txt = plainText(q.prompt).trim();
+  const compact = !q.visual && (/^[\d\s+−×=?:<>,.\/]+$/.test(txt) || txt.length <= 18);
+  const speakBtn = canSpeak ? '<button class="speak" aria-label="écouter la consigne">🔊</button>' : '';
   screen(`
-    <header class="mission-top"><button class="close" aria-label="quitter">✕</button>${progressBar()}</header>
-    ${arena()}
-    <main class="question">
-      <div class="q-card">
-        <div class="q-prompt"><p>${q.prompt}</p>${canSpeak ? '<button class="speak" aria-label="écouter la consigne">🔊</button>' : ''}</div>
-        ${q.visual ? `<div class="q-visual">${q.visual}</div>` : ''}
-        <div class="q-answer">${answerArea(q)}</div>
-        <div class="feedback" aria-live="assertive"></div>
+    <div class="battle">
+      <header class="b-top">
+        <button class="b-pause" aria-label="pause">❚❚</button>
+        ${progressBar()}
+        <div class="b-stars">${mission.deadline ? '<span class="timer"></span>' : `⭐ ${state.stars}`}</div>
+      </header>
+      <div class="stage">
+        ${sceneBg(mission.theme)}
+        ${compact ? `<div class="banner-q"><span>${q.prompt}</span>${speakBtn}</div>` : ''}
+        <div class="hero-wrap">${hero(rocketColor(), 104)}</div>
+        <div class="beam"></div>
+        <div class="foe">
+          <div class="foe-hp"><b>${f.name}</b><div class="hp"><div class="hp-fill" style="width:${(hp / total) * 100}%"></div></div></div>
+          <div class="bubble"></div>
+          ${foeSvg(f, f.boss ? 124 : 110)}
+          <div class="impact">💥</div>
+        </div>
       </div>
-    </main>`, 'mission' + (mission.kind !== 'normal' ? ' boss-fight' : ''));
+      <main class="b-panel">
+        <div class="q-card ${compact ? 'compact' : ''}">
+          ${compact ? '' : `<div class="q-prompt"><p>${q.prompt}</p>${speakBtn}</div>`}
+          ${q.visual ? `<div class="q-visual">${q.visual}</div>` : ''}
+          <div class="q-answer">${answerArea(view)}</div>
+          <div class="feedback" aria-live="assertive"></div>
+        </div>
+      </main>
+    </div>`, `mission theme-${mission.theme}${mission.kind !== 'normal' && !mission.arcade ? ' boss-fight' : ''}`);
   tick();
 
-  app.querySelector('.close').addEventListener('click', () => {
-    if (confirm('Quitter la mission ? Ta progression sur cette mission sera perdue.')) { stopMission(); mission = null; renderHome(); }
-  });
+  app.querySelector('.b-pause').addEventListener('click', pauseMenu);
   const sayText = q.say || q.prompt;
   app.querySelector('.speak')?.addEventListener('click', () => speak(sayText));
   if (state.autoSpeak) setTimeout(() => speak(sayText), 300);
 
-  ({ numpad: bindNumpad, choice: bindChoice, order: bindOrder, line: bindLine })[q.type](q);
+  ({ numpad: bindNumpad, choice: bindChoice, tiles: bindChoice, order: bindOrder, line: bindLine })[view.type](view);
 }
 
 function bindNumpad(q) {
@@ -437,12 +545,16 @@ function bindNumpad(q) {
 }
 
 function bindChoice(q) {
-  app.querySelectorAll('.choices button').forEach((b) => b.addEventListener('click', () => {
+  const buttons = [...app.querySelectorAll('.choices button, .tiles button')];
+  const choose = (b) => {
     if (locked || b.disabled) return;
     const ok = b.dataset.c === q.answer;
     b.classList.add(ok ? 'good' : 'bad');
     check(ok, () => { b.disabled = true; });
-  }));
+  };
+  buttons.forEach((b) => b.addEventListener('click', () => choose(b)));
+  // Sur ordinateur : touches 1 à 4 pour choisir une tuile.
+  setKeyHandler((e) => { const i = Number(e.key) - 1; if (i >= 0 && i < buttons.length) choose(buttons[i]); });
 }
 
 function bindOrder(q) {
@@ -497,23 +609,33 @@ function animate(el, cls) {
   el.classList.remove(cls); void el.getBoundingClientRect(); el.classList.add(cls);
 }
 
-function hitFoe() {
+function hitFoe(first) {
   mission.hits++;
   const total = foeHp();
   const fill = app.querySelector('.hp-fill');
   if (fill) fill.style.width = `${(Math.max(0, total - mission.hits) / total) * 100}%`;
-  animate(app.querySelector('.arena'), 'shoot');
-  animate(app.querySelector('.foe'), 'hit');
+  animate(app.querySelector('.hero-wrap'), 'shoot');
+  animate(app.querySelector('.beam'), 'fire');
+  setTimeout(() => {
+    animate(app.querySelector('.foe'), mission.hits >= total ? 'defeated' : 'hit');
+    animate(app.querySelector('.impact'), 'boom');
+    if (first) {
+      const s = document.createElement('div');
+      s.className = 'star-pop'; s.textContent = '⭐';
+      app.querySelector('.foe')?.appendChild(s);
+    }
+  }, 220);
 }
 
 function taunt() {
   const b = app.querySelector('.bubble');
   if (b) { b.textContent = pick(TAUNTS); animate(b, 'show'); }
   animate(app.querySelector('.foe'), 'laugh');
+  animate(app.querySelector('.hero-wrap'), 'hurt');
 }
 
 // Vérifie une réponse : indice à la 1re erreur, correction à la 2e.
-// Défi éclair : pas d'indice, la correction s'affiche brièvement pour garder le rythme.
+// Défis chronométrés : pas d'indice, la correction s'affiche brièvement pour garder le rythme.
 function check(ok, resetInput) {
   const q = mission.questions[mission.idx];
   const fb = app.querySelector('.feedback');
@@ -530,11 +652,11 @@ function check(ok, resetInput) {
     sfx.good();
     // Associer à l'oral l'opération et son résultat : « 3 fois 7, 21 ».
     if (q.fact && state.sound) speak(`${q.fact[0]} fois ${q.fact[1]}, ${q.fact[0] * q.fact[1]}`);
-    hitFoe();
+    hitFoe(first);
     card.classList.add('win');
     fb.className = 'feedback good';
-    fb.innerHTML = `<b>${pick(BRAVO)}</b> ${first ? '⭐' : ''}`;
-    nextTimer = setTimeout(next, flash ? (q.fact && state.sound ? 1300 : 650) : 1200);
+    fb.innerHTML = `<b>${pick(BRAVO)}</b>`;
+    nextTimer = setTimeout(next, flash ? (q.fact && state.sound ? 1300 : 700) : 1300);
     return;
   }
   sfx.bad();
@@ -565,6 +687,7 @@ function check(ok, resetInput) {
 
 function next() {
   if (!mission) return;
+  if (mission.paused) { mission.pendingNext = true; return; }
   locked = false;
   mission.idx++;
   if (mission.kind === 'tables') {
@@ -579,30 +702,31 @@ function renderResult() {
   if (!mission) return;
   stopMission();
   if (mission.arcade) return arcadeResult();
-  const { planetId, kind, score, results, foe } = mission;
+  const { planetId, kind, score, results, foe, node } = mission;
   const total = mission.questions.length;
-  const won = kind === 'normal' ? mission.hits === total
+  const passed = kind === 'normal' ? score >= Store.PASS_SCORE
     : kind === 'flash' ? score >= Store.FLASH.toWin : score >= Store.BOSS.toWin;
-  const out = Store.finishMission(state, { planetId, score, total, kind, won, alienId: foe.id });
+  const out = Store.finishMission(state, { planetId, score, total, kind, won: passed, passed, alienId: foe.id, node });
   persist();
-  if (won) sfx.win(); else sfx.bad();
+  if (passed) sfx.win(); else sfx.bad();
   const p = planetId && planetById(planetId);
 
   let title, sub;
   if (kind === 'normal') {
-    title = won ? (score === total ? 'Mission parfaite !' : 'Alien capturé !') : 'Mission accomplie !';
-    sub = won ? `Tu as capturé <b>${foe.name}</b> !` : `${foe.name} s'est échappé… Il reviendra, et tu seras encore plus fort !`;
+    title = passed ? (score === total ? 'Mission parfaite !' : 'Alien capturé !') : 'Il s\'est échappé…';
+    sub = passed ? `Tu as capturé <b>${foe.name}</b> !` : `Il fallait ${Store.PASS_SCORE} bonnes réponses du premier coup, tu en as ${score}. Réessaie, tu vas y arriver !`;
   } else {
-    title = won ? 'Boss vaincu !' : 'Le boss résiste…';
-    sub = won ? `Tu as battu <b>${foe.name}</b> !` : `Tu as réussi ${score} défi${score > 1 ? 's' : ''} sur ${total}. Il en fallait ${kind === 'flash' ? Store.FLASH.toWin : Store.BOSS.toWin}. Entraîne-toi et retente ta chance !`;
+    title = passed ? 'Boss vaincu !' : 'Le boss résiste…';
+    sub = passed ? `Tu as battu <b>${foe.name}</b> !` : `Tu as réussi ${score} défi${score > 1 ? 's' : ''} sur ${total}. Il en fallait ${kind === 'flash' ? Store.FLASH.toWin : Store.BOSS.toWin}. Entraîne-toi et retente ta chance !`;
   }
+  const shownStars = passed || kind !== 'normal' ? Math.min(3, Store.starsFor(score, total)) : 0;
   screen(`
     <main class="result">
       <h2>${title}</h2>
-      <div class="foe-result ${won ? 'caught' : 'fled'}">${foeSvg(foe, 110)}</div>
+      <div class="foe-result ${passed ? 'caught' : 'fled'}">${foeSvg(foe, 120)}</div>
       <p>${sub}</p>
-      <div class="big-stars">${[1, 2, 3].map((i) => `<span class="${i <= Math.min(3, out.stars) ? 'on' : ''}" style="animation-delay:${i * 0.25}s">★</span>`).join('')}</div>
-      <p class="small">+${out.stars} étoile${out.stars > 1 ? 's' : ''}${kind !== 'normal' && won ? ' (bonus de boss inclus)' : ''}</p>
+      <div class="big-stars">${[1, 2, 3].map((i) => `<span class="${i <= shownStars ? 'on' : ''}" style="animation-delay:${i * 0.25}s">★</span>`).join('')}</div>
+      <p class="small">+${out.stars} étoile${out.stars > 1 ? 's' : ''}${kind !== 'normal' && passed ? ' (bonus de boss inclus)' : ''}</p>
       <div class="recap">${results.map((r) => `<span class="${r ? 'ok' : 'ko'}">${r ? '✓' : '•'}</span>`).join('')}</div>
       ${out.levelUp ? `<div class="banner level">🎉 Niveau <b>${state.planets[planetId].level}</b> débloqué sur ${p.name} !</div>` : ''}
       ${out.mastered ? `<div class="banner level">👑 Tu es Maître de ${p.name} !</div>` : ''}
@@ -610,16 +734,20 @@ function renderResult() {
       ${out.goalReached ? '<div class="banner badge">✅ Objectif du jour atteint !</div>' : ''}
       ${out.newBadges.map((b) => `<div class="banner badge">${b.icon} Nouveau trophée : <b>${b.name}</b></div>`).join('')}
       ${out.newRockets.map((r) => `<div class="banner badge">${rocket(r.color, 28)} Nouvelle fusée débloquée : <b>${r.name}</b> !</div>`).join('')}
-      ${p && Store.bossReady(state.planets[planetId]) && kind === 'normal' ? `<div class="banner boss">⚔️ Le boss de ${p.name} est apparu !</div>` : ''}
+      ${p && Store.bossReady(state.planets[planetId]) && kind === 'normal' && out.advanced ? `<div class="banner boss">⚔️ Le boss de ${p.name} t'attend !</div>` : ''}
       <div class="result-actions">
-        <button class="btn primary big" id="again">${kind !== 'normal' && !won ? 'Réessayer ⚔️' : 'Encore une mission 🚀'}</button>
-        <button class="btn" data-go="home">Retour à la carte</button>
+        ${p ? `<button class="btn primary big" id="continue">${passed ? 'Continuer ➜' : 'Réessayer 🔁'}</button>
+               <button class="btn" id="map">Voir la carte</button>`
+          : `<button class="btn primary big" id="again">Encore une mission 🚀</button><button class="btn" data-go="home">Retour</button>`}
       </div>
     </main>`, 'space');
-  app.querySelector('#again').addEventListener('click', () => {
-    if (planetId && Store.bossReady(state.planets[planetId])) renderBossIntro(planetId);
-    else startMission(planetId, 'normal');
-  });
+  if (p) {
+    app.querySelector('#continue').addEventListener('click', () => {
+      if (!passed) return Store.isBossNode(node) ? renderBossIntro(planetId, node) : startMission(planetId, kind, node);
+      renderMap(planetId, out.advanced || out.levelUp);
+    });
+    app.querySelector('#map').addEventListener('click', () => renderMap(planetId));
+  } else app.querySelector('#again').addEventListener('click', () => startMission(null, 'normal'));
   mission = null;
 }
 
@@ -667,7 +795,7 @@ function renderTrophies() {
         ...[1, 2, 3, 4, 5].map((L) => ({ id: `${p.id}-${L}`, name: Store.ALIEN_NAMES[p.id][L - 1], level: L, boss: false })),
         ...[1, 2, 3, 4, 5].map((L) => ({ id: `${p.id}-boss-${L}`, name: `Boss niv. ${L}`, level: L, boss: true })),
       ].map((a) => `<div class="album-card ${caught.has(a.id) ? 'got' : ''} ${a.boss ? 'is-boss' : ''}">
-          ${alien(caught.has(a.id) ? Store.ALIEN_COLORS[p.id] : '#ffffff22', a.level, a.boss, 54)}
+          ${monster(caught.has(a.id) ? Store.ALIEN_COLORS[p.id] : '#ffffff22', a.level, a.boss, 58)}
           <small>${caught.has(a.id) ? a.name : '?'}</small></div>`).join('')}</div></div>`).join('')}
       <h3>Trophées</h3>
       <div class="badges">${Store.BADGES.map((b) => {
@@ -740,7 +868,7 @@ function renderParent() {
 
       <section>
         <h3>Niveaux par planète</h3>
-        <p class="note">Après ${Store.XP_TO_BOSS} missions réussies (au moins 4/5 du premier coup), un boss apparaît. Le battre fait passer au niveau suivant.
+        <p class="note">Chaque niveau compte ${Store.XP_TO_BOSS} étapes (réussies avec au moins ${Store.PASS_SCORE}/5 du premier coup), puis un boss. Le battre fait passer au niveau suivant.
           Sur Calculo, le boss est un « Défi éclair » : ${Store.FLASH.size} calculs en 3 minutes, la fluence attendue en fin de CE1.</p>
         ${PLANETS.map((p) => {
           const ps = state.planets[p.id];
@@ -760,6 +888,8 @@ function renderParent() {
         <div class="tables ${customTables ? '' : 'disabled'}">${[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((t) =>
           `<label class="tbl ${tablesShown.includes(t) ? 'on' : ''}"><input type="checkbox" value="${t}" ${tablesShown.includes(t) ? 'checked' : ''} ${customTables ? '' : 'disabled'}>×${t}</label>`).join('')}</div>
         <label class="row"><input type="checkbox" id="flashTimer" ${state.flashTimer ? 'checked' : ''}> Chronomètre pour le Défi éclair (3 minutes)</label>
+        <label class="row">Réponses aux calculs :
+          <select id="answerMode"><option value="tiles" ${state.answerMode !== 'pad' ? 'selected' : ''}>🎮 4 tuiles (comme un jeu)</option><option value="pad" ${state.answerMode === 'pad' ? 'selected' : ''}>🔢 Pavé numérique (sans deviner)</option></select></label>
         <p class="note">Mémorisation : un résultat est « sûr » après plusieurs bonnes réponses du premier coup ; une erreur le fait revenir plus souvent (récupération espacée). Records : Défi tables ${state.records.tables || 0} (objectif ${Store.TABLES_CHALLENGE.goal} en 1 min), Défi éclair ${state.records.flash || 0}/12.</p>
         <div class="mastery">${[2, 3, 4, 5, 6, 7, 8, 9].map((t) => {
           const keys = Array.from({ length: 10 }, (_, i) => factKey(t, i + 1));
@@ -826,6 +956,7 @@ function renderParent() {
     c.parentElement.classList.toggle('on', c.checked);
   }));
   app.querySelector('#flashTimer').addEventListener('change', (e) => { state.flashTimer = e.target.checked; persist(); });
+  app.querySelector('#answerMode').addEventListener('change', (e) => { state.answerMode = e.target.value; persist(); });
   app.querySelector('#pname').addEventListener('change', (e) => { const v = e.target.value.trim(); if (v) { state.name = v; persist(); } });
   app.querySelector('#snd').addEventListener('change', (e) => { state.sound = e.target.checked; persist(); });
   app.querySelector('#auto').addEventListener('change', (e) => { state.autoSpeak = e.target.checked; persist(); });

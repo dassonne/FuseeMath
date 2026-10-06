@@ -1,6 +1,6 @@
 // Génère beaucoup d'exercices à chaque niveau et vérifie leur cohérence.
 // Lancer : node tests/generators.test.mjs
-import { SKILLS, NUM_MAX, buildMission, buildFlash, PLANETS, tablesQuestion, factKey } from '../js/skills.js';
+import { SKILLS, NUM_MAX, buildMission, buildFlash, PLANETS, tablesQuestion, factKey, answerTiles } from '../js/skills.js';
 import { toWords } from '../js/util.js';
 
 let failures = 0;
@@ -19,6 +19,10 @@ for (const skill of SKILLS) {
       if (!q.prompt || !q.hint || !q.explain) fail(`${where}: texte manquant`, q);
       if (/\bde [aeiouéœ]/i.test(q.prompt + q.hint)) fail(`${where}: élision manquante (de → d')`, q);
       if (/undefined|NaN/.test(q.prompt + q.explain + q.hint + (q.visual || '') + (q.say || ''))) fail(`${where}: undefined/NaN`, q);
+      if (q.type === 'numpad') {
+        const t = answerTiles(q);
+        if (t.length !== 4 || new Set(t).size !== 4 || !t.includes(q.answer) || t.some((v) => v < 0)) fail(`${where}: tuiles invalides ${t}`, q);
+      }
       switch (q.type) {
         case 'numpad':
           if (!Number.isInteger(q.answer) || q.answer < 0) fail(`${where}: réponse invalide`, q);

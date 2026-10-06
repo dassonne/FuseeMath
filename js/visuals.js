@@ -279,3 +279,94 @@ export function month(name, start, nDays, highlight = null) {
   for (let i = 0; i < cells.length; i += 7) rows.push(`<tr>${cells.slice(i, i + 7).join('')}</tr>`);
   return `<table class="vis month"><caption>${name}</caption><thead><tr>${head}</tr></thead><tbody>${rows.join('')}</tbody></table>`;
 }
+
+// Héros astronaute avec son blaster (la couleur de la combinaison suit la fusée choisie).
+export function hero(color = '#ff4d4d', size = 120) {
+  const suit = color === 'arc' ? '#ff8a3d' : color;
+  return `<svg class="hero-svg" width="${size}" height="${size}" viewBox="0 0 120 120" aria-hidden="true">
+    <ellipse cx="55" cy="114" rx="30" ry="5" fill="#0002"/>
+    <rect x="18" y="52" width="16" height="34" rx="6" fill="#d9dde8" stroke="#23204a" stroke-width="3"/>
+    <rect x="34" y="88" width="13" height="22" rx="5" fill="${suit}" stroke="#23204a" stroke-width="3"/>
+    <rect x="55" y="88" width="13" height="22" rx="5" fill="${suit}" stroke="#23204a" stroke-width="3"/>
+    <rect x="31" y="105" width="19" height="9" rx="4" fill="#5b5f73" stroke="#23204a" stroke-width="3"/>
+    <rect x="52" y="105" width="19" height="9" rx="4" fill="#5b5f73" stroke="#23204a" stroke-width="3"/>
+    <rect x="28" y="56" width="46" height="40" rx="14" fill="${suit}" stroke="#23204a" stroke-width="3"/>
+    <rect x="42" y="66" width="18" height="12" rx="3" fill="#fff8" stroke="#23204a" stroke-width="2"/>
+    <circle cx="47" cy="72" r="2.5" fill="#3ddc84"/><circle cx="55" cy="72" r="2.5" fill="#ffd23f"/>
+    <circle cx="51" cy="36" r="27" fill="#f1f3fa" stroke="#23204a" stroke-width="3"/>
+    <rect x="31" y="22" width="40" height="30" rx="14" fill="#2b3a67" stroke="#23204a" stroke-width="3"/>
+    <circle cx="44" cy="37" r="6.5" fill="#fff"/><circle cx="60" cy="37" r="6.5" fill="#fff"/>
+    <circle class="eye" cx="45.5" cy="38" r="3.4" fill="#23204a"/><circle class="eye" cx="61.5" cy="38" r="3.4" fill="#23204a"/>
+    <path d="M47 45 Q52 49 57 45" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M36 27 Q42 23 48 25" fill="none" stroke="#fff8" stroke-width="3" stroke-linecap="round"/>
+    <line x1="51" y1="9" x2="51" y2="2" stroke="#23204a" stroke-width="3"/><circle cx="51" cy="2" r="3.5" fill="#ff4d4d"/>
+    <g class="blaster">
+      <rect x="60" y="66" width="44" height="14" rx="6" fill="#4fd1ff" stroke="#23204a" stroke-width="3"/>
+      <rect x="100" y="68" width="10" height="10" rx="3" fill="#ff7ad9" stroke="#23204a" stroke-width="3"/>
+      <rect x="66" y="78" width="10" height="13" rx="3" fill="#2b3a67" stroke="#23204a" stroke-width="3"/>
+      <circle cx="80" cy="73" r="3" fill="#fff"/>
+      <circle cx="68" cy="80" r="7" fill="${suit}" stroke="#23204a" stroke-width="3"/>
+    </g>
+  </svg>`;
+}
+
+// Tête du héros pour la barre de progression.
+export function heroHead(color = '#ff4d4d', size = 30) {
+  return `<svg width="${size}" height="${size}" viewBox="20 6 62 62" aria-hidden="true">
+    <circle cx="51" cy="36" r="27" fill="#f1f3fa" stroke="#23204a" stroke-width="4"/>
+    <rect x="31" y="22" width="40" height="30" rx="14" fill="#2b3a67"/>
+    <circle cx="44" cy="37" r="6" fill="#fff"/><circle cx="60" cy="37" r="6" fill="#fff"/>
+    <circle cx="45" cy="38" r="3" fill="#23204a"/><circle cx="61" cy="38" r="3" fill="#23204a"/>
+    <rect x="44" y="58" width="14" height="8" fill="${color === 'arc' ? '#ff8a3d' : color}"/></svg>`;
+}
+
+// Monstre de combat : corps gélatineux, bras, pieds, et accessoires selon le niveau.
+export function monster(color, level = 1, boss = false, size = 130) {
+  const eyes = level % 3 === 0 ? [[60, 52, 13]] : level % 3 === 1 ? [[48, 50, 10], [70, 46, 12]] : [[42, 52, 8], [58, 44, 9], [74, 52, 8]];
+  const hat = boss ? `<path d="M36 22 L42 2 L52 15 L60 -2 L68 15 L78 2 L84 22 Z" fill="#ffd23f" stroke="#23204a" stroke-width="3"/>
+      <circle cx="60" cy="6" r="3" fill="#ff4d4d"/>`
+    : level >= 4 ? `<path d="M30 30 L18 10 L40 24 Z M90 30 L102 10 L80 24 Z" fill="#fff" stroke="#23204a" stroke-width="3"/>`
+    : level >= 2 ? `<line x1="48" y1="22" x2="40" y2="4" stroke="#23204a" stroke-width="3"/><circle cx="40" cy="4" r="5" fill="${color}" stroke="#23204a" stroke-width="2"/>
+      <line x1="72" y1="22" x2="80" y2="4" stroke="#23204a" stroke-width="3"/><circle cx="80" cy="4" r="5" fill="${color}" stroke="#23204a" stroke-width="2"/>` : '';
+  return `<svg class="monster-svg${boss ? ' boss' : ''}" width="${size}" height="${size}" viewBox="0 -6 120 132" aria-hidden="true">
+    <ellipse cx="60" cy="122" rx="38" ry="6" fill="#0002"/>
+    <path class="m-arm-l" d="M22 70 Q4 64 8 50" fill="none" stroke="#23204a" stroke-width="9" stroke-linecap="round"/>
+    <path class="m-arm-l" d="M22 70 Q4 64 8 50" fill="none" stroke="${color}" stroke-width="5" stroke-linecap="round"/>
+    <path class="m-arm-r" d="M98 70 Q116 64 112 50" fill="none" stroke="#23204a" stroke-width="9" stroke-linecap="round"/>
+    <path class="m-arm-r" d="M98 70 Q116 64 112 50" fill="none" stroke="${color}" stroke-width="5" stroke-linecap="round"/>
+    <path d="M18 104 C6 70 18 22 60 20 C102 22 114 70 102 104 C96 118 82 110 74 118 C66 124 54 124 46 118 C38 110 24 118 18 104Z" fill="${color}" stroke="#23204a" stroke-width="3.5"/>
+    <path d="M30 40 Q38 30 50 30" fill="none" stroke="#fff7" stroke-width="6" stroke-linecap="round"/>
+    <ellipse cx="44" cy="98" rx="8" ry="4" fill="#fff3"/>
+    ${eyes.map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="#fff" stroke="#23204a" stroke-width="2.5"/><circle class="m-pupil" cx="${x - r / 3}" cy="${y + 1}" r="${r / 2.2}" fill="#23204a"/>`).join('')}
+    <path class="m-mouth" d="M46 80 Q60 90 74 80" fill="none" stroke="#23204a" stroke-width="4" stroke-linecap="round"/>
+    <path d="M55 83 L57 89 L60 84 Z" fill="#fff" stroke="#23204a" stroke-width="1.5"/>
+    ${hat}</svg>`;
+}
+
+// Décor de combat (ciel, astres, collines, sol) aux couleurs de la planète.
+const SCENES = {
+  nombres: { sky: ['#ffe7c2', '#ffc58a'], hill: '#f4a259', hill2: '#e98a3c', ground: '#e8b07a', ground2: '#c98a54', deco: '🪨🌵' },
+  calcul: { sky: ['#cfeaff', '#9fc8ff'], hill: '#7aa7e8', hill2: '#5a86cf', ground: '#a8c4ee', ground2: '#7f9fd6', deco: '💎🧊' },
+  problemes: { sky: ['#e2ffd6', '#b6f0a2'], hill: '#69c46b', hill2: '#4aa253', ground: '#9fd27c', ground2: '#76b357', deco: '🍄🌿' },
+  grandeurs: { sky: ['#f6e0ff', '#e2b6ff'], hill: '#b77be6', hill2: '#9459c9', ground: '#d4a9ef', ground2: '#ac7fd0', deco: '🔷🔶' },
+  temps: { sky: ['#d9fff8', '#a6efe4'], hill: '#4cc3b2', hill2: '#2f9e8f', ground: '#93dccf', ground2: '#5fb8aa', deco: '⏳🕰️' },
+  arcade: { sky: ['#ffe0ec', '#ffc0d6'], hill: '#ff8fb3', hill2: '#e86b94', ground: '#ffb3c9', ground2: '#e38aa6', deco: '⭐🎈' },
+};
+export const sceneColors = (id) => SCENES[id] || SCENES.arcade;
+
+export function sceneBg(id) {
+  const c = sceneColors(id);
+  return `<svg class="scene-bg" viewBox="0 0 400 200" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+    <defs><linearGradient id="sky-${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${c.sky[0]}"/><stop offset="1" stop-color="${c.sky[1]}"/></linearGradient></defs>
+    <rect width="400" height="200" fill="url(#sky-${id})"/>
+    <circle cx="318" cy="38" r="26" fill="#fff6"/><circle cx="318" cy="38" r="26" fill="none" stroke="#fff9" stroke-width="2"/>
+    <ellipse cx="318" cy="40" rx="44" ry="8" fill="none" stroke="#fff8" stroke-width="3"/>
+    <circle cx="360" cy="70" r="12" fill="#fff5"/><circle cx="70" cy="30" r="4" fill="#fff"/><circle cx="200" cy="18" r="3" fill="#fff"/>
+    <path d="M0 140 Q40 92 90 120 T190 112 T300 118 T400 104 V200 H0Z" fill="${c.hill}" opacity=".55"/>
+    <path d="M0 150 Q60 118 120 140 T260 136 T400 130 V200 H0Z" fill="${c.hill2}" opacity=".6"/>
+    <rect y="156" width="400" height="44" fill="${c.ground}"/>
+    <path d="M0 156 Q20 150 40 156 T80 156 T120 156 T160 156 T200 156 T240 156 T280 156 T320 156 T360 156 T400 156" fill="none" stroke="${c.ground2}" stroke-width="4"/>
+    <ellipse cx="60" cy="176" rx="14" ry="4" fill="${c.ground2}" opacity=".6"/><ellipse cx="230" cy="186" rx="20" ry="5" fill="${c.ground2}" opacity=".5"/>
+    <ellipse cx="340" cy="174" rx="10" ry="3" fill="${c.ground2}" opacity=".6"/>
+  </svg>`;
+}

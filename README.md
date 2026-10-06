@@ -4,7 +4,9 @@ Une application web ludique pour s'entraîner aux maths du CE1, sur téléphone,
 
 L'enfant pilote une fusée et explore 5 planètes, une par domaine du programme :
 
-Inspiré de MathHero : chaque mission est un combat contre un alien, chaque bonne réponse le touche avec un laser.
+Inspiré de MathHero :
+- **Carte d'aventure** pour chaque planète : un chemin de 20 étapes (5 niveaux de 3 étapes + 1 boss), avec jusqu'à 3 étoiles par étape. On peut rejouer une étape pour améliorer ses étoiles.
+- **Écran de combat** : un héros astronaute avec son blaster affronte un monstre dans un décor propre à chaque planète. Chaque bonne réponse le touche ; les calculs s'affichent en grand et se répondent avec 4 tuiles (ou au pavé numérique, au choix des parents).
 
 | Planète | Domaine | Exemples de notions |
 |---|---|---|
@@ -26,9 +28,9 @@ Les contenus suivent le programme de mathématiques 2025 et les quatre séquence
 
 ## Fonctionnement
 
-- **Missions de 5 questions contre un alien.** Il est capturé (et rejoint l'album) si toutes les réponses sont trouvées. Jusqu'à 3 étoiles selon les réussites du premier coup.
+- **Étapes de 5 questions contre un alien.** Il est capturé (et l'étape réussie) avec au moins 3 bonnes réponses du premier coup. Jusqu'à 3 étoiles par étape.
 - **Erreurs :** à la première erreur, un indice ; à la deuxième, la correction expliquée. La notion revient en priorité ensuite.
-- **Niveaux 1 à 5**, calqués sur les 5 périodes de l'année. Après 3 missions réussies (au moins 4/5 du premier coup), **un boss apparaît** : le battre fait passer au niveau suivant.
+- **Niveaux 1 à 5**, calqués sur les 5 périodes de l'année. Après les 3 étapes d'un niveau, **un boss** garde le passage : le battre fait passer au niveau suivant.
   - Boss classique : 8 défis, 6 réussis du premier coup pour gagner.
   - Sur Calculo, **Défi éclair** : 12 calculs en 3 minutes, 10 réussis pour gagner (le chronomètre peut être désactivé).
 - **Objectif du jour :** 3 missions (environ 10-15 minutes).

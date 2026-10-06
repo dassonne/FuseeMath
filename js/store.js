@@ -4,7 +4,15 @@ import { todayStr, dayStr } from './util.js';
 
 const KEY = 'fusee-maths-v1';
 export const MISSION_SIZE = 5;
-export const XP_TO_BOSS = 3; // missions réussies (≥ 4/5 du premier coup) avant d'affronter le boss du niveau
+export const XP_TO_BOSS = 3; // étapes réussies avant d'affronter le boss du niveau
+export const PASS_SCORE = 3; // réponses justes du premier coup (sur 5) pour réussir une étape
+
+// Carte d'aventure : chaque niveau compte 3 étapes puis un boss, soit 20 étapes par planète.
+export const NODES_PER_LEVEL = XP_TO_BOSS + 1;
+export const NODES = 5 * NODES_PER_LEVEL;
+export const nodeLevel = (i) => Math.floor(i / NODES_PER_LEVEL) + 1;
+export const isBossNode = (i) => i % NODES_PER_LEVEL === NODES_PER_LEVEL - 1;
+export const currentNode = (p) => (p.master ? NODES : (p.level - 1) * NODES_PER_LEVEL + Math.min(p.xp, XP_TO_BOSS));
 export const DAILY_GOAL = 3; // missions par jour (~10-15 minutes)
 export const BOSS = { size: 8, toWin: 6 };
 export const FLASH = { size: 12, seconds: 180, toWin: 10 }; // fluence fin de CE1 : 12 calculs en 3 minutes
@@ -56,7 +64,7 @@ export const BADGES = [
 function defaults() {
   return {
     name: '', rocket: 'rouge', stars: 0, missions: 0, perfect: 0, bossWins: 0, flashWins: 0,
-    planets: Object.fromEntries(PLANETS.map((p) => [p.id, { level: 1, xp: 0, played: 0, master: false }])),
+    planets: Object.fromEntries(PLANETS.map((p) => [p.id, { level: 1, xp: 0, played: 0, master: false, nodes: {} }])),
     skills: {}, // id -> { attempts, firstTry, last }
     review: [], // notions ratées récemment, reproposées en priorité
     aliens: [], // aliens capturés (album)
@@ -64,7 +72,7 @@ function defaults() {
     records: { flash: 0, tables: 0, memory: 0 }, // meilleurs scores des défis (memory : moins de coups)
     badges: [], history: [], lastDay: null, streak: 0, bestStreak: 0,
     daily: { date: null, count: 0 }, goalsMet: 0,
-    pin: null, sound: true, autoSpeak: false, tables: null, flashTimer: true,
+    pin: null, sound: true, autoSpeak: false, tables: null, flashTimer: true, answerMode: 'tiles',
   };
 }
 
@@ -92,7 +100,7 @@ export function save(state) {
 }
 
 export function reset(state) {
-  const keep = { name: state.name, pin: state.pin, sound: state.sound, autoSpeak: state.autoSpeak, tables: state.tables, flashTimer: state.flashTimer };
+  const keep = { name: state.name, pin: state.pin, sound: state.sound, autoSpeak: state.autoSpeak, tables: state.tables, flashTimer: state.flashTimer, answerMode: state.answerMode };
   return { ...defaults(), ...keep };
 }
 
@@ -159,7 +167,8 @@ export function starsFor(score, total) {
 }
 
 // Fin de mission : étoiles, niveau, boss, série de jours, badges. Renvoie ce qui a changé.
-// m = { planetId, score, total, kind: 'normal' | 'boss' | 'flash', won, alienId }
+// m = { planetId, score, total, kind: 'normal' | 'boss' | 'flash', won, alienId, node }
+// `node` : étape de la carte jouée. Rejouer une étape déjà réussie améliore ses étoiles sans faire avancer.
 export function finishMission(state, m) {
   const starsBefore = state.stars;
   let stars = starsFor(m.score, m.total);
@@ -182,12 +191,15 @@ export function finishMission(state, m) {
 
   let levelUp = false, mastered = false;
   const p = m.planetId && state.planets[m.planetId];
+  let advanced = false;
   if (p) {
     p.played++;
+    const node = m.node ?? currentNode(p);
+    const onFront = node === currentNode(p);
+    if (m.won || m.kind === 'normal') p.nodes[node] = Math.max(p.nodes[node] || 0, m.kind === 'normal' && !m.passed ? 0 : stars > 3 ? 3 : stars);
     if (m.kind === 'normal') {
-      if (m.score >= m.total - 1) p.xp = Math.min(XP_TO_BOSS, p.xp + 1);
-      else if (m.score <= 1) p.xp = Math.max(0, p.xp - 1);
-    } else if (m.won) {
+      if (onFront && m.passed && p.xp < XP_TO_BOSS) { p.xp++; advanced = true; }
+    } else if (m.won && onFront) {
       state.bossWins++;
       if (m.kind === 'flash') state.flashWins++;
       if (p.level < 5) { p.level++; p.xp = 0; levelUp = true; } else { p.master = true; mastered = true; }
@@ -202,5 +214,5 @@ export function finishMission(state, m) {
   const newBadges = BADGES.filter((b) => !state.badges.includes(b.id) && b.test(state));
   state.badges.push(...newBadges.map((b) => b.id));
   const newRockets = ROCKETS.filter((r) => r.stars > starsBefore && r.stars <= state.stars);
-  return { stars, levelUp, mastered, newBadges, newRockets, newAlien, goalReached };
+  return { stars, levelUp, mastered, advanced, newBadges, newRockets, newAlien, goalReached };
 }
